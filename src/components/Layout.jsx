@@ -9,6 +9,7 @@ export default function Layout({ children }) {
     { to: "/teachers", label: "المعلمون" },
     { to: "/classes", label: "الأقسام" },
     { to: "/students", label: "الطلاب" },
+    { to: "/reports", label: "التقارير" },
   ]
   const commonLinks = [{ to: "/attendance", label: "الحضور" }]
   const links = role === "admin" ? [...adminLinks, ...commonLinks] : commonLinks
