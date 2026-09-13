@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { AuthProvider, useAuth } from "./context/AuthContext"
 import Login from "./pages/Login"
 import Layout from "./components/Layout"
+import Dashboard from "./pages/Dashboard"
 import Teachers from "./pages/Teachers"
 import Classes from "./pages/Classes"
 import Students from "./pages/Students"
@@ -15,7 +16,7 @@ function AdminRoute({ children }) {
 
 function Home() {
   const { role } = useAuth()
-  if (role === "admin") return <Navigate to="/teachers" />
+  if (role === "admin") return <Navigate to="/dashboard" />
   return <Navigate to="/attendance" />
 }
 
@@ -32,6 +33,7 @@ function AppContent() {
     <Layout>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
         <Route path="/teachers" element={<AdminRoute><Teachers /></AdminRoute>} />
         <Route path="/classes" element={<AdminRoute><Classes /></AdminRoute>} />
         <Route path="/students" element={<AdminRoute><Students /></AdminRoute>} />
