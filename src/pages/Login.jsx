@@ -1,9 +1,9 @@
 import { useState } from "react"
 import { signInWithEmailAndPassword } from "firebase/auth"
-import { auth } from "../firebase"
+import { auth, LOGIN_DOMAIN } from "../firebase"
 
 export default function Login() {
-  const [email, setEmail] = useState("")
+  const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -13,9 +13,11 @@ export default function Login() {
     setError("")
     setLoading(true)
     try {
+      const value = identifier.trim().toLowerCase()
+      const email = value.includes("@") ? value : `${value}@${LOGIN_DOMAIN}`
       await signInWithEmailAndPassword(auth, email, password)
     } catch (err) {
-      setError("البريد الإلكتروني أو كلمة المرور غير صحيحة")
+      setError("اسم المستخدم أو كلمة المرور غير صحيحة")
     }
     setLoading(false)
   }
@@ -33,11 +35,11 @@ export default function Login() {
           الفرع المحلي بمعتمر
         </p>
 
-        <label className="block text-sm text-gray-600 mb-1">البريد الإلكتروني</label>
+        <label className="block text-sm text-gray-600 mb-1">اسم المستخدم</label>
         <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
           required
           className="w-full border rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
         />
