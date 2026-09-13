@@ -2,12 +2,24 @@ import { useEffect, useState } from "react"
 import { collection, onSnapshot, addDoc, deleteDoc, doc, query, where } from "firebase/firestore"
 import { db } from "../firebase"
 
+const DAYS = [
+  { key: "sun", label: "الأحد" },
+  { key: "mon", label: "الإثنين" },
+  { key: "tue", label: "الثلاثاء" },
+  { key: "wed", label: "الأربعاء" },
+  { key: "thu", label: "الخميس" },
+  { key: "fri", label: "الجمعة" },
+  { key: "sat", label: "السبت" },
+]
+
 export default function Classes() {
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
   const [name, setName] = useState("")
   const [level, setLevel] = useState("")
   const [teacherId, setTeacherId] = useState("")
+  const [days, setDays] = useState([])
+  const [time, setTime] = useState("")
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -25,11 +37,17 @@ export default function Classes() {
     return unsub
   }, [])
 
+  const toggleDay = (key) => {
+    setDays((prev) =>
+      prev.includes(key) ? prev.filter((d) => d !== key) : [...prev, key]
+    )
+  }
+
   const handleAdd = async (e) => {
     e.preventDefault()
     setError("")
-    if (!name.trim() || !teacherId) {
-      setError("يرجى إدخال اسم القسم واختيار المعلم")
+    if (!name.trim() || !teacherId || days.length === 0 || !time) {
+      setError("يرجى ملء جميع الحقول واختيار يوم واحد على الأقل")
       return
     }
     const teacher = teachers.find((t) => t.id === teacherId)
@@ -39,10 +57,14 @@ export default function Classes() {
         level: level.trim(),
         teacherId,
         teacherName: teacher?.name || "",
+        days,
+        time,
       })
       setName("")
       setLevel("")
       setTeacherId("")
+      setDays([])
+      setTime("")
     } catch {
       setError("حدث خطأ أثناء الإضافة")
     }
@@ -53,6 +75,9 @@ export default function Classes() {
       await deleteDoc(doc(db, "classes", id))
     }
   }
+
+  const dayLabels = (keys) =>
+    keys.map((k) => DAYS.find((d) => d.key === k)?.label).join("، ")
 
   return (
     <div>
@@ -66,43 +91,4 @@ export default function Classes() {
           className="w-full border rounded-lg px-3 py-2 text-sm"
         />
         <input
-          placeholder="المستوى"
-          value={level}
-          onChange={(e) => setLevel(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
-        />
-        <select
-          value={teacherId}
-          onChange={(e) => setTeacherId(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="">اختر المعلم</option>
-          {teachers.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-        {error && <p className="text-red-600 text-xs">{error}</p>}
-        <button type="submit" className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium">
-          إضافة قسم
-        </button>
-      </form>
-
-      <div className="space-y-2">
-        {classes.map((c) => (
-          <div key={c.id} className="bg-white rounded-xl shadow-sm p-3 flex items-center justify-between">
-            <div>
-              <p className="font-medium text-sm">{c.name}</p>
-              <p className="text-xs text-gray-500">{c.level} — {c.teacherName}</p>
-            </div>
-            <button onClick={() => handleDelete(c.id)} className="text-red-600 text-xs">
-              حذف
-            </button>
-          </div>
-        ))}
-        {classes.length === 0 && (
-          <p className="text-gray-400 text-sm text-center py-6">لا توجد أقسام بعد</p>
-        )}
-      </div>
-    </div>
-  )
-}
+          placeholder="المستو
