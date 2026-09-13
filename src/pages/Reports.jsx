@@ -49,40 +49,48 @@ export default function Reports() {
       "تاريخ التسجيل": s.enrollDate,
     }))
 
-  const loadAttendanceRows = async () => {
+  const loadAttendancePivot = async () => {
     const snap = await getDocs(
       query(collection(db, "attendance"), where("classId", "==", attClassId))
     )
     const cls = classes.find((c) => c.id === attClassId)
-    const studentMap = {}
-    students.filter((s) => s.classId === attClassId).forEach((s) => { studentMap[s.id] = s.name })
+    const classStudents = students.filter((s) => s.classId === attClassId)
 
-    const rows = []
-    snap.docs
+    const records = snap.docs
       .map((d) => d.data())
       .filter((a) => a.date >= startDate && a.date <= endDate)
       .sort((a, b) => (a.date > b.date ? 1 : -1))
-      .forEach((a) => {
-        Object.entries(a.records || {}).forEach(([studentId, present]) => {
-          rows.push({
-            "التاريخ": a.date,
-            "الطالب": studentMap[studentId] || studentId,
-            "الحالة": present ? "حاضر" : "غائب",
-          })
-        })
+
+    const rows = classStudents.map((s) => {
+      const row = { "الطالب": s.name }
+      records.forEach((r) => {
+        const present = r.records ? r.records[s.id] : undefined
+        row[r.date] = present === undefined ? "-" : (present ? "حاضر" : "غائب")
       })
-    return { rows, className: cls?.name || "" }
+      return row
+    })
+
+    return {
+      rows,
+      hasDates: records.length > 0,
+      className: cls?.name || "",
+      teacherName: cls?.teacherName || "",
+    }
   }
 
   const handleAttendanceExcel = async () => {
     setLoading(true)
     setError("")
     try {
-      const { rows } = await loadAttendanceRows()
-      if (rows.length === 0) {
+      const { rows, hasDates, className, teacherName } = await loadAttendancePivot()
+      if (!hasDates || rows.length === 0) {
         setError("لا يوجد سجل حضور في هذه الفترة")
       } else {
-        exportExcel("attendance", rows)
+        exportExcel("attendance", rows, [
+          `القسم: ${className}`,
+          `المعلم: ${teacherName}`,
+          `الفترة: من ${startDate} إلى ${endDate}`,
+        ])
       }
     } catch {
       setError("حدث خطأ أثناء تحميل البيانات")
@@ -94,13 +102,17 @@ export default function Reports() {
     setLoading(true)
     setError("")
     try {
-      const { rows, className } = await loadAttendanceRows()
-      if (rows.length === 0) {
+      const { rows, hasDates, className, teacherName } = await loadAttendancePivot()
+      if (!hasDates || rows.length === 0) {
         setError("لا يوجد سجل حضور في هذه الفترة")
       } else {
         printReport({
           title: "سجل الحضور",
-          subtitle: `${className} - من ${startDate} إلى ${endDate}`,
+          subtitleLines: [
+            `القسم: ${className}`,
+            `المعلم: ${teacherName}`,
+            `الفترة: من ${startDate} إلى ${endDate}`,
+          ],
           rows,
         })
       }
