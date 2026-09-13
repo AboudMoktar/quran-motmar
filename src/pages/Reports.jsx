@@ -12,6 +12,7 @@ const DAYS_LABELS = {
 export default function Reports() {
   const [classes, setClasses] = useState([])
   const [students, setStudents] = useState([])
+  const [byClassSelection, setByClassSelection] = useState("all")
   const [attClassId, setAttClassId] = useState("")
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
@@ -49,8 +50,12 @@ export default function Reports() {
       "تاريخ التسجيل": s.enrollDate,
     }))
 
-  const studentsByClassData = () =>
-    classes.map((c) => ({
+  const studentsByClassData = () => {
+    const targetClasses = byClassSelection === "all"
+      ? classes
+      : classes.filter((c) => c.id === byClassSelection)
+
+    return targetClasses.map((c) => ({
       className: c.name,
       teacherName: c.teacherName,
       rows: students
@@ -63,9 +68,18 @@ export default function Reports() {
           "تاريخ التسجيل": s.enrollDate,
         })),
     }))
+  }
 
   const handleStudentsByClassExcel = () => {
     const data = studentsByClassData()
+    if (byClassSelection !== "all" && data.length === 1) {
+      exportExcel(`students_${data[0].className}`, data[0].rows, [
+        `القسم: ${data[0].className}`,
+        `المعلم: ${data[0].teacherName}`,
+        `عدد الطلاب: ${data[0].rows.length}`,
+      ])
+      return
+    }
     const sheets = data.map((d) => ({
       name: d.className,
       headerLines: [`القسم: ${d.className}`, `المعلم: ${d.teacherName}`, `عدد الطلاب: ${d.rows.length}`],
@@ -76,6 +90,14 @@ export default function Reports() {
 
   const handleStudentsByClassPrint = () => {
     const data = studentsByClassData()
+    if (byClassSelection !== "all" && data.length === 1) {
+      printReport({
+        title: `قائمة طلاب: ${data[0].className}`,
+        subtitleLines: [`المعلم: ${data[0].teacherName}`, `عدد الطلاب: ${data[0].rows.length}`],
+        rows: data[0].rows,
+      })
+      return
+    }
     const sections = data
       .filter((d) => d.rows.length > 0)
       .map((d) => ({
@@ -162,7 +184,7 @@ export default function Reports() {
     <div>
       <h2 className="text-lg font-bold mb-4">التقارير</h2>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
         <p className="font-medium text-sm">قائمة الأقسام</p>
         <div className="flex gap-2">
           <button
@@ -180,7 +202,7 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
         <p className="font-medium text-sm">قائمة الطلاب (كل الطلاب)</p>
         <div className="flex gap-2">
           <button
@@ -198,8 +220,18 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
         <p className="font-medium text-sm">قوائم الطلاب حسب الأقسام</p>
+        <select
+          value={byClassSelection}
+          onChange={(e) => setByClassSelection(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="all">جميع الأقسام</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
         <div className="flex gap-2">
           <button
             onClick={handleStudentsByClassExcel}
@@ -216,7 +248,7 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
         <p className="font-medium text-sm">سجل الحضور</p>
         <select
           value={attClassId}
