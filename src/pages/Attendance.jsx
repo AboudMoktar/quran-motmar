@@ -53,6 +53,17 @@ export default function Attendance() {
     load()
   }, [classId, date])
 
+  useEffect(() => {
+    if (students.length === 0) return
+    setRecords((prev) => {
+      const next = { ...prev }
+      students.forEach((s) => {
+        if (!(s.id in next)) next[s.id] = false
+      })
+      return next
+    })
+  }, [students])
+
   const toggle = (studentId) => {
     setRecords((prev) => ({ ...prev, [studentId]: !prev[studentId] }))
   }
@@ -61,10 +72,14 @@ export default function Attendance() {
     setSaving(true)
     setMessage("")
     try {
+      const fullRecords = {}
+      students.forEach((s) => {
+        fullRecords[s.id] = !!records[s.id]
+      })
       await setDoc(doc(db, "attendance", `${classId}_${date}`), {
         classId,
         date,
-        records,
+        records: fullRecords,
       })
       setMessage("تم حفظ الحضور بنجاح")
     } catch {
@@ -110,7 +125,7 @@ export default function Attendance() {
 
         {selectedClass && (
           <p className="text-xs text-gray-500">
-            أيام الحصص: {(selectedClass.days || []).map((d) => DAYS_LABELS[d]).join("، ")} — {selectedClass.time}
+            أيام الحصص: {(selectedClass.days || []).map((d) => DAYS_LABELS[d]).join(" - ")} — {selectedClass.time}
           </p>
         )}
 
