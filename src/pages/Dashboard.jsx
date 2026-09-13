@@ -1,33 +1,45 @@
 import { useEffect, useState } from "react"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "../firebase"
+import { PAYMENT_ALERT_DAY, MONTHLY_FEE } from "../config"
 
 const LOW_ATTENDANCE_THRESHOLD = 70
+const MONTH_LABELS = {
+  "01": "جانفي", "02": "فيفري", "03": "مارس", "04": "أفريل",
+  "05": "ماي", "06": "جوان", "07": "جويلية", "08": "أوت",
+  "09": "سبتمبر", "10": "أكتوبر", "11": "نوفمبر", "12": "ديسمبر"
+}
 
 export default function Dashboard() {
   const [classes, setClasses] = useState([])
   const [students, setStudents] = useState([])
   const [teachers, setTeachers] = useState([])
   const [attendance, setAttendance] = useState([])
+  const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
   const [openClasses, setOpenClasses] = useState({})
 
-  const today = new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const today = now.toISOString().slice(0, 10)
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  const dayOfMonth = now.getDate()
 
   useEffect(() => {
     const load = async () => {
-      const [classesSnap, studentsSnap, teachersSnap, attendanceSnap] = await Promise.all([
+      const [classesSnap, studentsSnap, teachersSnap, attendanceSnap, paymentsSnap] = await Promise.all([
         getDocs(collection(db, "classes")),
         getDocs(collection(db, "students")),
         getDocs(query(collection(db, "users"), where("role", "==", "teacher"))),
         getDocs(collection(db, "attendance")),
+        getDocs(query(collection(db, "payments"), where("month", "==", currentMonthKey))),
       ])
       setClasses(classesSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
       setStudents(studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
       setTeachers(teachersSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
       setAttendance(attendanceSnap.docs.map((d) => d.data()))
+      setPayments(paymentsSnap.docs.map((d) => d.data()))
       setLoading(false)
     }
     load()
@@ -88,6 +100,10 @@ export default function Dashboard() {
     .filter((s) => s.rate !== null && s.rate < LOW_ATTENDANCE_THRESHOLD)
     .sort((a, b) => a.rate - b.rate)
 
+  const paidStudentIds = new Set(payments.map((p) => p.studentId))
+  const unpaidStudents = students.filter((s) => !paidStudentIds.has(s.id))
+  const showPaymentAlert = dayOfMonth >= PAYMENT_ALERT_DAY
+
   if (loading) {
     return <div className="text-center py-10 text-gray-500">جارٍ التحميل...</div>
   }
@@ -95,6 +111,30 @@ export default function Dashboard() {
   return (
     <div>
       <h2 className="text-lg font-bold mb-4">لوحة التحكم</h2>
+
+      {showPaymentAlert && unpaidStudents.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+          <p className="font-medium text-sm text-red-700 mb-1">
+            تنبيه: اشتراكات غير مدفوعة لشهر {MONTH_LABELS[currentMonthKey.slice(5)]}
+          </p>
+          <p className="text-xs text-red-500 mb-3">
+            يرجى التواصل مع أولياء الأمور التالية أسماؤهم لتذكيرهم بالاشتراك ({MONTHLY_FEE} د.ت)
+          </p>
+          <div className="space-y-2">
+            {unpaidStudents.map((s) => (
+              <div key={s.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">{s.name}</p>
+                  <p className="text-xs text-gray-500">{s.className}</p>
+                </div>
+                <span className="text-sm text-emerald-700 font-medium" dir="ltr">
+                  {s.parentPhone || "-"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-white rounded-xl shadow-sm p-4 text-center">
