@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { auth, LOGIN_DOMAIN } from "../firebase"
+import { ASSOCIATION_NAME, BRANCH_LABEL } from "../config"
 
 export default function Login() {
   const [identifier, setIdentifier] = useState("")
@@ -29,10 +30,10 @@ export default function Login() {
         className="bg-white rounded-2xl shadow-md p-6 w-full max-w-sm"
       >
         <h1 className="text-xl font-bold text-emerald-700 text-center mb-1">
-          الرابطة الوطنية للقرآن الكريم
+          {ASSOCIATION_NAME}
         </h1>
         <p className="text-gray-500 text-center text-sm mb-6">
-          الفرع المحلي بمعتمر
+          {BRANCH_LABEL}
         </p>
 
         <label className="block text-sm text-gray-600 mb-1">اسم المستخدم</label>
