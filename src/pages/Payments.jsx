@@ -24,6 +24,7 @@ export default function Payments() {
   const [payments, setPayments] = useState({})
   const [historyStudentId, setHistoryStudentId] = useState("")
   const [history, setHistory] = useState([])
+  const [message, setMessage] = useState("")
 
   const monthKey = `${year}-${month}`
 
@@ -64,19 +65,30 @@ export default function Payments() {
     return unsub
   }, [classId, monthKey])
 
-  const togglePaid = async (studentId) => {
-    const paymentId = `${studentId}_${monthKey}`
-    if (payments[studentId]) {
+  const togglePaid = async (student) => {
+    const paymentId = `${student.id}_${monthKey}`
+    setMessage("")
+
+    if (payments[student.id]) {
+      const confirmed = confirm(`هل تريد إلغاء تسجيل دفع ${student.name} لشهر ${MONTH_LABELS[month]}؟`)
+      if (!confirmed) return
       await deleteDoc(doc(db, "payments", paymentId))
+      setMessage(`تم إلغاء تسجيل الدفع لـ ${student.name}`)
     } else {
+      const confirmed = confirm(
+        `تأكيد استلام اشتراك ${student.name} لشهر ${MONTH_LABELS[month]} ${year} بمبلغ ${MONTHLY_FEE} د.ت؟`
+      )
+      if (!confirmed) return
       await setDoc(doc(db, "payments", paymentId), {
-        studentId,
+        studentId: student.id,
         classId,
         month: monthKey,
         amount: MONTHLY_FEE,
         paidDate: new Date().toISOString().slice(0, 10),
       })
+      setMessage(`تم تأكيد استلام اشتراك ${student.name} بنجاح ✅`)
     }
+    setTimeout(() => setMessage(""), 4000)
   }
 
   useEffect(() => {
@@ -101,7 +113,7 @@ export default function Payments() {
       <div className="bg-white rounded-xl shadow-sm p-4 mb-6 space-y-3">
         <select
           value={classId}
-          onChange={(e) => { setClassId(e.target.value); setHistoryStudentId("") }}
+          onChange={(e) => { setClassId(e.target.value); setHistoryStudentId(""); setMessage("") }}
           className="w-full border rounded-lg px-3 py-2 text-sm"
         >
           <option value="">اختر القسم</option>
@@ -130,6 +142,12 @@ export default function Payments() {
         <p className="text-xs text-gray-500">قيمة الاشتراك الشهري: {MONTHLY_FEE} د.ت</p>
       </div>
 
+      {message && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg p-3 mb-4 text-center">
+          {message}
+        </div>
+      )}
+
       {classId && (
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <p className="text-sm font-medium mb-3">قائمة الطلاب - {MONTH_LABELS[month]} {year}</p>
@@ -138,12 +156,12 @@ export default function Payments() {
               <div key={s.id} className="flex items-center justify-between border-b pb-2 last:border-0">
                 <span className="text-sm">{s.name}</span>
                 <button
-                  onClick={() => togglePaid(s.id)}
+                  onClick={() => togglePaid(s)}
                   className={`px-3 py-1 rounded-lg text-xs ${
                     payments[s.id] ? "bg-emerald-700 text-white" : "bg-red-100 text-red-700"
                   }`}
                 >
-                  {payments[s.id] ? "مدفوع" : "غير مدفوع"}
+                  {payments[s.id] ? "مدفوع ✓" : "غير مدفوع"}
                 </button>
               </div>
             ))}
