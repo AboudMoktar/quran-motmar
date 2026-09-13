@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, addDoc, deleteDoc, doc } from "firebase/firestore"
+import { collection, onSnapshot, addDoc, deleteDoc, doc, query, where } from "firebase/firestore"
 import { db } from "../firebase"
 
 export default function Students() {
   const [students, setStudents] = useState([])
   const [classes, setClasses] = useState([])
+  const [todayStatus, setTodayStatus] = useState({})
   const [name, setName] = useState("")
   const [age, setAge] = useState("")
   const [parentPhone, setParentPhone] = useState("")
@@ -23,6 +24,22 @@ export default function Students() {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "classes"), (snap) => {
       setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    })
+    return unsub
+  }, [])
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const q = query(collection(db, "attendance"), where("date", "==", today))
+    const unsub = onSnapshot(q, (snap) => {
+      const map = {}
+      snap.docs.forEach((d) => {
+        const records = d.data().records || {}
+        Object.keys(records).forEach((studentId) => {
+          map[studentId] = records[studentId]
+        })
+      })
+      setTodayStatus(map)
     })
     return unsub
   }, [])
@@ -59,6 +76,15 @@ export default function Students() {
     if (confirm("هل تريد حذف هذا الطالب؟")) {
       await deleteDoc(doc(db, "students", id))
     }
+  }
+
+  const renderBadge = (studentId) => {
+    if (!(studentId in todayStatus)) {
+      return <span className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500">لم يسجل بعد</span>
+    }
+    return todayStatus[studentId]
+      ? <span className="text-xs px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700">حاضر اليوم</span>
+      : <span className="text-xs px-2 py-1 rounded-lg bg-red-100 text-red-700">غائب اليوم</span>
   }
 
   return (
@@ -116,15 +142,18 @@ export default function Students() {
 
       <div className="space-y-2">
         {students.map((s) => (
-          <div key={s.id} className="bg-white rounded-xl shadow-sm p-3 flex items-center justify-between">
-            <div>
-              <p className="font-medium text-sm">{s.name} ({s.age} سنة)</p>
-              <p className="text-xs text-gray-500">{s.className} — {s.level}</p>
-              <p className="text-xs text-gray-400">ولي الأمر: {s.parentPhone}</p>
+          <div key={s.id} className="bg-white rounded-xl shadow-sm p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="font-medium text-sm">{s.name} ({s.age} سنة)</p>
+                <p className="text-xs text-gray-500">{s.className} — {s.level}</p>
+                <p className="text-xs text-gray-400">ولي الأمر: {s.parentPhone}</p>
+              </div>
+              <button onClick={() => handleDelete(s.id)} className="text-red-600 text-xs">
+                حذف
+              </button>
             </div>
-            <button onClick={() => handleDelete(s.id)} className="text-red-600 text-xs">
-              حذف
-            </button>
+            {renderBadge(s.id)}
           </div>
         ))}
         {students.length === 0 && (
