@@ -1,8 +1,10 @@
 import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 
+const ROLE_LABELS = { admin: "مدير", teacher: "معلم" }
+
 export default function Layout({ children }) {
-  const { role, logout } = useAuth()
+  const { role, name, logout } = useAuth()
   const location = useLocation()
 
   const adminLinks = [
@@ -17,19 +19,24 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-emerald-700 text-white p-4 flex items-center justify-between">
-        <h1 className="font-bold text-sm">الرابطة الوطنية للقرآن الكريم</h1>
-        <button onClick={logout} className="text-sm bg-emerald-800 px-3 py-1 rounded-lg">
-          خروج
-        </button>
+      <header className="bg-emerald-700 text-white p-4">
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="font-bold text-sm">الرابطة الوطنية للقرآن الكريم</h1>
+          <button onClick={logout} className="text-xs bg-emerald-800 px-3 py-1 rounded-lg">
+            خروج
+          </button>
+        </div>
+        <p className="text-xs text-emerald-100">
+          متصل الآن: {name || "غير معروف"} ({ROLE_LABELS[role] || role})
+        </p>
       </header>
 
-      <nav className="flex bg-white border-b overflow-x-auto">
+      <nav className="flex flex-wrap bg-white border-b">
         {links.map((link) => (
           <Link
             key={link.to}
             to={link.to}
-            className={`px-4 py-3 text-sm whitespace-nowrap ${
+            className={`px-3 py-2 text-xs whitespace-nowrap ${
               location.pathname === link.to
                 ? "text-emerald-700 border-b-2 border-emerald-700 font-medium"
                 : "text-gray-500"
