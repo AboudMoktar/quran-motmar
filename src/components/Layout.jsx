@@ -16,7 +16,10 @@ export default function Layout({ children }) {
     { to: "/students", label: "الطلاب" },
     { to: "/reports", label: "التقارير" },
   ]
-  const commonLinks = [{ to: "/attendance", label: "الحضور" }]
+  const commonLinks = [
+    { to: "/attendance", label: "الحضور" },
+    { to: "/payments", label: "الاشتراكات" },
+  ]
   const links = role === "admin" ? [...adminLinks, ...commonLinks] : commonLinks
 
   return (
@@ -42,7 +45,7 @@ export default function Layout({ children }) {
         </p>
       </header>
 
-      <nav className="flex bg-white border-b border-gray-200 overflow-hidden">
+      <nav className="flex flex-wrap bg-white border-b border-gray-200">
         {links.map((link) => (
           <Link
             key={link.to}
