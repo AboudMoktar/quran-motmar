@@ -6,6 +6,7 @@ export default function Layout({ children }) {
   const location = useLocation()
 
   const adminLinks = [
+    { to: "/dashboard", label: "لوحة التحكم" },
     { to: "/teachers", label: "المعلمون" },
     { to: "/classes", label: "الأقسام" },
     { to: "/students", label: "الطلاب" },
