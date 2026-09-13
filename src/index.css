@@ -6,3 +6,16 @@ body {
   font-family: 'Tajawal', sans-serif;
   background-color: #f8fafc;
 }
+
+#print-root {
+  display: none;
+}
+
+@media print {
+  body > #root {
+    display: none !important;
+  }
+  #print-root {
+    display: block !important;
+  }
+}
