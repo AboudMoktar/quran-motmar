@@ -11,6 +11,7 @@ export function exportExcel(filename, rows, headerLines = []) {
   }
 
   const wb = XLSX.utils.book_new()
+  wb.Workbook = { Views: [{ RTL: true }] }
   XLSX.utils.book_append_sheet(wb, ws, "Sheet1")
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
