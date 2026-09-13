@@ -5,11 +5,13 @@ export default function Layout({ children }) {
   const { role, logout } = useAuth()
   const location = useLocation()
 
-  const links = [
+  const adminLinks = [
     { to: "/teachers", label: "المعلمون" },
     { to: "/classes", label: "الأقسام" },
     { to: "/students", label: "الطلاب" },
   ]
+  const commonLinks = [{ to: "/attendance", label: "الحضور" }]
+  const links = role === "admin" ? [...adminLinks, ...commonLinks] : commonLinks
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -20,23 +22,21 @@ export default function Layout({ children }) {
         </button>
       </header>
 
-      {role === "admin" && (
-        <nav className="flex bg-white border-b overflow-x-auto">
-          {links.map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className={`px-4 py-3 text-sm whitespace-nowrap ${
-                location.pathname === link.to
-                  ? "text-emerald-700 border-b-2 border-emerald-700 font-medium"
-                  : "text-gray-500"
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-      )}
+      <nav className="flex bg-white border-b overflow-x-auto">
+        {links.map((link) => (
+          <Link
+            key={link.to}
+            to={link.to}
+            className={`px-4 py-3 text-sm whitespace-nowrap ${
+              location.pathname === link.to
+                ? "text-emerald-700 border-b-2 border-emerald-700 font-medium"
+                : "text-gray-500"
+            }`}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
 
       <main className="p-4">{children}</main>
     </div>
