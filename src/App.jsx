@@ -5,24 +5,17 @@ import Layout from "./components/Layout"
 import Teachers from "./pages/Teachers"
 import Classes from "./pages/Classes"
 import Students from "./pages/Students"
+import Attendance from "./pages/Attendance"
 
 function AdminRoute({ children }) {
   const { role } = useAuth()
   return role === "admin" ? children : <Navigate to="/" />
 }
 
-function TeacherHome() {
-  return (
-    <div className="p-4 text-center text-gray-500">
-      لوحة المعلم قيد الإنشاء
-    </div>
-  )
-}
-
 function Home() {
   const { role } = useAuth()
   if (role === "admin") return <Navigate to="/teachers" />
-  return <TeacherHome />
+  return <Navigate to="/attendance" />
 }
 
 function AppContent() {
@@ -41,6 +34,7 @@ function AppContent() {
         <Route path="/teachers" element={<AdminRoute><Teachers /></AdminRoute>} />
         <Route path="/classes" element={<AdminRoute><Classes /></AdminRoute>} />
         <Route path="/students" element={<AdminRoute><Students /></AdminRoute>} />
+        <Route path="/attendance" element={<Attendance />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>
