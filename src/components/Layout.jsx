@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { LOGO_BASE64 } from "../assets/logo"
+import { ASSOCIATION_NAME, BRANCH_LABEL } from "../config"
 
 const ROLE_LABELS = { admin: "مدير", teacher: "معلم" }
 
@@ -27,7 +28,10 @@ export default function Layout({ children }) {
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <img src={LOGO_BASE64} className="w-9 h-9 object-contain rounded-full bg-white p-0.5" />
-            <h1 className="font-bold text-sm">الرابطة الوطنية للقرآن الكريم</h1>
+            <div>
+              <h1 className="font-bold text-xs leading-tight">{ASSOCIATION_NAME}</h1>
+              <p className="text-[10px] text-emerald-100 leading-tight">{BRANCH_LABEL}</p>
+            </div>
           </div>
           <button onClick={logout} className="text-xs bg-emerald-900 px-3 py-1 rounded-lg">
             خروج
