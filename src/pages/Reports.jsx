@@ -16,6 +16,7 @@ export default function Reports() {
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
@@ -50,12 +51,7 @@ export default function Reports() {
 
   const loadAttendanceRows = async () => {
     const snap = await getDocs(
-      query(
-        collection(db, "attendance"),
-        where("classId", "==", attClassId),
-        where("date", ">=", startDate),
-        where("date", "<=", endDate)
-      )
+      query(collection(db, "attendance"), where("classId", "==", attClassId))
     )
     const cls = classes.find((c) => c.id === attClassId)
     const studentMap = {}
@@ -64,6 +60,7 @@ export default function Reports() {
     const rows = []
     snap.docs
       .map((d) => d.data())
+      .filter((a) => a.date >= startDate && a.date <= endDate)
       .sort((a, b) => (a.date > b.date ? 1 : -1))
       .forEach((a) => {
         Object.entries(a.records || {}).forEach(([studentId, present]) => {
@@ -79,19 +76,37 @@ export default function Reports() {
 
   const handleAttendanceExcel = async () => {
     setLoading(true)
-    const { rows } = await loadAttendanceRows()
-    exportExcel("attendance", rows)
+    setError("")
+    try {
+      const { rows } = await loadAttendanceRows()
+      if (rows.length === 0) {
+        setError("لا يوجد سجل حضور في هذه الفترة")
+      } else {
+        exportExcel("attendance", rows)
+      }
+    } catch {
+      setError("حدث خطأ أثناء تحميل البيانات")
+    }
     setLoading(false)
   }
 
   const handleAttendancePrint = async () => {
     setLoading(true)
-    const { rows, className } = await loadAttendanceRows()
-    printReport({
-      title: "سجل الحضور",
-      subtitle: `${className} - من ${startDate} إلى ${endDate}`,
-      rows,
-    })
+    setError("")
+    try {
+      const { rows, className } = await loadAttendanceRows()
+      if (rows.length === 0) {
+        setError("لا يوجد سجل حضور في هذه الفترة")
+      } else {
+        printReport({
+          title: "سجل الحضور",
+          subtitle: `${className} - من ${startDate} إلى ${endDate}`,
+          rows,
+        })
+      }
+    } catch {
+      setError("حدث خطأ أثناء تحميل البيانات")
+    }
     setLoading(false)
   }
 
@@ -161,20 +176,21 @@ export default function Reports() {
             className="flex-1 border rounded-lg px-3 py-2 text-sm"
           />
         </div>
+        {error && <p className="text-red-600 text-xs">{error}</p>}
         <div className="flex gap-2">
           <button
             onClick={handleAttendanceExcel}
             disabled={!attClassId || loading}
             className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
           >
-            Excel
+            {loading ? "..." : "Excel"}
           </button>
           <button
             onClick={handleAttendancePrint}
             disabled={!attClassId || loading}
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
           >
-            PDF / طباعة
+            {loading ? "..." : "PDF / طباعة"}
           </button>
         </div>
       </div>
