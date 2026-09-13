@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app"
+import { initializeApp, getApps } from "firebase/app"
 import { getAuth } from "firebase/auth"
 import { getFirestore } from "firebase/firestore"
 
@@ -14,3 +14,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+
+const secondaryApp = getApps().find((a) => a.name === "Secondary")
+  || initializeApp(firebaseConfig, "Secondary")
+export const secondaryAuth = getAuth(secondaryApp)
+
+export const LOGIN_DOMAIN = "quran-motmar.local"
