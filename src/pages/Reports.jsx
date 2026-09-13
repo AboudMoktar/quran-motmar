@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "../firebase"
-import { exportExcel } from "../utils/exportExcel"
-import { printReport } from "../utils/printReport"
+import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
+import { printReport, printMultiSection } from "../utils/printReport"
 
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
@@ -48,6 +48,42 @@ export default function Reports() {
       "القسم": s.className,
       "تاريخ التسجيل": s.enrollDate,
     }))
+
+  const studentsByClassData = () =>
+    classes.map((c) => ({
+      className: c.name,
+      teacherName: c.teacherName,
+      rows: students
+        .filter((s) => s.classId === c.id)
+        .map((s) => ({
+          "الاسم": s.name,
+          "السن": s.age,
+          "هاتف ولي الأمر": s.parentPhone,
+          "المستوى": s.level,
+          "تاريخ التسجيل": s.enrollDate,
+        })),
+    }))
+
+  const handleStudentsByClassExcel = () => {
+    const data = studentsByClassData()
+    const sheets = data.map((d) => ({
+      name: d.className,
+      headerLines: [`القسم: ${d.className}`, `المعلم: ${d.teacherName}`, `عدد الطلاب: ${d.rows.length}`],
+      rows: d.rows,
+    }))
+    exportExcelMultiSheet("students_by_class", sheets)
+  }
+
+  const handleStudentsByClassPrint = () => {
+    const data = studentsByClassData()
+    const sections = data
+      .filter((d) => d.rows.length > 0)
+      .map((d) => ({
+        heading: `${d.className} - المعلم: ${d.teacherName} (${d.rows.length} طالب)`,
+        rows: d.rows,
+      }))
+    printMultiSection({ title: "قوائم الطلاب حسب الأقسام", sections })
+  }
 
   const loadAttendancePivot = async () => {
     const snap = await getDocs(
@@ -145,7 +181,7 @@ export default function Reports() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3">
-        <p className="font-medium text-sm">قائمة الطلاب</p>
+        <p className="font-medium text-sm">قائمة الطلاب (كل الطلاب)</p>
         <div className="flex gap-2">
           <button
             onClick={() => exportExcel("students", studentRows())}
@@ -155,6 +191,24 @@ export default function Reports() {
           </button>
           <button
             onClick={() => printReport({ title: "قائمة الطلاب", rows: studentRows() })}
+            className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
+          >
+            PDF / طباعة
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3">
+        <p className="font-medium text-sm">قوائم الطلاب حسب الأقسام</p>
+        <div className="flex gap-2">
+          <button
+            onClick={handleStudentsByClassExcel}
+            className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm"
+          >
+            Excel
+          </button>
+          <button
+            onClick={handleStudentsByClassPrint}
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
           >
             PDF / طباعة
