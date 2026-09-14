@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react"
 import { collection, onSnapshot, addDoc, deleteDoc, doc, query, where } from "firebase/firestore"
+import { Search } from "lucide-react"
 import { db } from "../firebase"
+import FAB from "../components/FAB"
+import BottomSheet from "../components/BottomSheet"
 
 const DAYS = [
   { key: "sun", label: "الأحد" },
@@ -15,6 +18,9 @@ const DAYS = [
 export default function Classes() {
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
+  const [search, setSearch] = useState("")
+  const [sheetOpen, setSheetOpen] = useState(false)
+
   const [name, setName] = useState("")
   const [level, setLevel] = useState("")
   const [teacherId, setTeacherId] = useState("")
@@ -43,6 +49,15 @@ export default function Classes() {
     )
   }
 
+  const resetForm = () => {
+    setName("")
+    setLevel("")
+    setTeacherId("")
+    setDays([])
+    setTime("")
+    setError("")
+  }
+
   const handleAdd = async (e) => {
     e.preventDefault()
     setError("")
@@ -60,11 +75,8 @@ export default function Classes() {
         days,
         time,
       })
-      setName("")
-      setLevel("")
-      setTeacherId("")
-      setDays([])
-      setTime("")
+      resetForm()
+      setSheetOpen(false)
     } catch {
       setError("حدث خطأ أثناء الإضافة")
     }
@@ -79,68 +91,26 @@ export default function Classes() {
   const dayLabels = (keys) =>
     keys.map((k) => DAYS.find((d) => d.key === k)?.label).join(" - ")
 
+  const filteredClasses = classes.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div>
       <h2 className="text-lg font-bold mb-4">الأقسام</h2>
 
-      <form onSubmit={handleAdd} className="bg-white rounded-xl shadow-sm p-4 mb-6 space-y-3">
+      <div className="relative mb-4">
+        <Search size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
-          placeholder="اسم القسم"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          placeholder="بحث عن قسم..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full border rounded-lg pr-10 pl-3 py-2 text-sm"
         />
-        <input
-          placeholder="المستوى"
-          value={level}
-          onChange={(e) => setLevel(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
-        />
-        <select
-          value={teacherId}
-          onChange={(e) => setTeacherId(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="">اختر المعلم</option>
-          {teachers.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-
-        <p className="text-sm text-gray-600">ايام الحصص</p>
-        <div className="flex flex-wrap gap-2">
-          {DAYS.map((d) => (
-            <button
-              type="button"
-              key={d.key}
-              onClick={() => toggleDay(d.key)}
-              className={`px-3 py-1 rounded-full text-xs border ${
-                days.includes(d.key)
-                  ? "bg-emerald-700 text-white border-emerald-700"
-                  : "bg-white text-gray-600 border-gray-300"
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-
-        <label className="block text-sm text-gray-600">وقت الحصة</label>
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
-        />
-
-        {error && <p className="text-red-600 text-xs">{error}</p>}
-        <button type="submit" className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium">
-          إضافة قسم
-        </button>
-      </form>
+      </div>
 
       <div className="space-y-2">
-        {classes.map((c) => (
+        {filteredClasses.map((c) => (
           <div key={c.id} className="bg-white rounded-xl shadow-sm p-3 flex items-center justify-between">
             <div>
               <p className="font-medium text-sm">{c.name}</p>
@@ -152,10 +122,72 @@ export default function Classes() {
             </button>
           </div>
         ))}
-        {classes.length === 0 && (
-          <p className="text-gray-400 text-sm text-center py-6">لا توجد أقسام بعد</p>
+        {filteredClasses.length === 0 && (
+          <p className="text-gray-400 text-sm text-center py-6">
+            {search ? "لا توجد نتائج" : "لا توجد أقسام بعد"}
+          </p>
         )}
       </div>
+
+      <FAB onClick={() => setSheetOpen(true)} />
+
+      <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="إضافة قسم">
+        <form onSubmit={handleAdd} className="space-y-3">
+          <input
+            placeholder="اسم القسم"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          />
+          <input
+            placeholder="المستوى"
+            value={level}
+            onChange={(e) => setLevel(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          />
+          <select
+            value={teacherId}
+            onChange={(e) => setTeacherId(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          >
+            <option value="">اختر المعلم</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+
+          <p className="text-sm text-gray-600">ايام الحصص</p>
+          <div className="flex flex-wrap gap-2">
+            {DAYS.map((d) => (
+              <button
+                type="button"
+                key={d.key}
+                onClick={() => toggleDay(d.key)}
+                className={`px-3 py-1 rounded-full text-xs border ${
+                  days.includes(d.key)
+                    ? "bg-emerald-700 text-white border-emerald-700"
+                    : "bg-white text-gray-600 border-gray-300"
+                }`}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+
+          <label className="block text-sm text-gray-600">وقت الحصة</label>
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          />
+
+          {error && <p className="text-red-600 text-xs">{error}</p>}
+          <button type="submit" className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium">
+            إضافة قسم
+          </button>
+        </form>
+      </BottomSheet>
     </div>
   )
 }
