@@ -196,8 +196,13 @@ export default function Students() {
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         title={editingId ? "تعديل بيانات الطالب" : "إضافة طالب"}
+        footer={
+          <button type="submit" form="student-form" className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium">
+            {editingId ? "حفظ التعديلات" : "إضافة طالب"}
+          </button>
+        }
       >
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form id="student-form" onSubmit={handleSubmit} className="space-y-3">
           <input
             placeholder="الإسم"
             value={form.firstName}
@@ -256,9 +261,6 @@ export default function Students() {
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
           {error && <p className="text-red-600 text-xs">{error}</p>}
-          <button type="submit" className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium">
-            {editingId ? "حفظ التعديلات" : "إضافة طالب"}
-          </button>
         </form>
       </BottomSheet>
     </div>
