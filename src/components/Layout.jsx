@@ -1,26 +1,12 @@
-import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { LOGO_BASE64 } from "../assets/logo"
 import { ASSOCIATION_NAME, BRANCH_LABEL } from "../config"
+import BottomNav from "./BottomNav"
 
 const ROLE_LABELS = { admin: "مدير", teacher: "معلم" }
 
 export default function Layout({ children }) {
   const { role, name, logout } = useAuth()
-  const location = useLocation()
-
-  const adminLinks = [
-    { to: "/dashboard", label: "لوحة التحكم" },
-    { to: "/teachers", label: "المعلمون" },
-    { to: "/classes", label: "الأقسام" },
-    { to: "/students", label: "الطلاب" },
-    { to: "/reports", label: "التقارير" },
-  ]
-  const commonLinks = [
-    { to: "/attendance", label: "الحضور" },
-    { to: "/payments", label: "الاشتراكات" },
-  ]
-  const links = role === "admin" ? [...adminLinks, ...commonLinks] : commonLinks
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -45,23 +31,9 @@ export default function Layout({ children }) {
         </p>
       </header>
 
-      <nav className="flex flex-wrap bg-white border-b border-gray-200">
-        {links.map((link) => (
-          <Link
-            key={link.to}
-            to={link.to}
-            className={`flex-1 min-w-0 text-center py-2 px-1 text-[10px] whitespace-nowrap overflow-hidden text-ellipsis ${
-              location.pathname === link.to
-                ? "text-emerald-700 border-b-2 border-gold-500 font-medium"
-                : "text-gray-500"
-            }`}
-          >
-            {link.label}
-          </Link>
-        ))}
-      </nav>
+      <main className="p-4 pb-20">{children}</main>
 
-      <main className="p-4">{children}</main>
+      <BottomNav role={role} />
     </div>
   )
 }
