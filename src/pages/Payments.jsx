@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { collection, onSnapshot, query, where, doc, setDoc, deleteDoc } from "firebase/firestore"
+import { Search } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 import { MONTHLY_FEE } from "../config"
@@ -18,6 +19,7 @@ export default function Payments() {
   const [classes, setClasses] = useState([])
   const [classId, setClassId] = useState("")
   const [students, setStudents] = useState([])
+  const [search, setSearch] = useState("")
   const now = new Date()
   const [year, setYear] = useState(String(now.getFullYear()))
   const [month, setMonth] = useState(MONTHS[now.getMonth()])
@@ -106,6 +108,10 @@ export default function Payments() {
     return unsub
   }, [historyStudentId])
 
+  const filteredStudents = students.filter((s) =>
+    s.name.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div>
       <h2 className="text-lg font-bold mb-4">الاشتراكات الشهرية</h2>
@@ -113,7 +119,7 @@ export default function Payments() {
       <div className="bg-white rounded-xl shadow-sm p-4 mb-6 space-y-3">
         <select
           value={classId}
-          onChange={(e) => { setClassId(e.target.value); setHistoryStudentId(""); setMessage("") }}
+          onChange={(e) => { setClassId(e.target.value); setHistoryStudentId(""); setMessage(""); setSearch("") }}
           className="w-full border rounded-lg px-3 py-2 text-sm"
         >
           <option value="">اختر القسم</option>
@@ -151,8 +157,19 @@ export default function Payments() {
       {classId && (
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <p className="text-sm font-medium mb-3">قائمة الطلاب - {MONTH_LABELS[month]} {year}</p>
+
+          <div className="relative mb-3">
+            <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              placeholder="بحث عن طالب..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full border rounded-lg pr-9 pl-3 py-2 text-sm"
+            />
+          </div>
+
           <div className="space-y-2">
-            {students.map((s) => (
+            {filteredStudents.map((s) => (
               <div key={s.id} className="flex items-center justify-between border-b pb-2 last:border-0">
                 <span className="text-sm">{s.name}</span>
                 <button
@@ -165,8 +182,10 @@ export default function Payments() {
                 </button>
               </div>
             ))}
-            {students.length === 0 && (
-              <p className="text-gray-400 text-sm text-center py-4">لا يوجد طلاب في هذا القسم</p>
+            {filteredStudents.length === 0 && (
+              <p className="text-gray-400 text-sm text-center py-4">
+                {search ? "لا توجد نتائج" : "لا يوجد طلاب في هذا القسم"}
+              </p>
             )}
           </div>
         </div>
