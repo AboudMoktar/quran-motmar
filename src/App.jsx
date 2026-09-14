@@ -9,6 +9,7 @@ import Students from "./pages/Students"
 import Attendance from "./pages/Attendance"
 import Payments from "./pages/Payments"
 import Reports from "./pages/Reports"
+import More from "./pages/More"
 
 function AdminRoute({ children }) {
   const { role } = useAuth()
@@ -39,6 +40,7 @@ function AppContent() {
         <Route path="/classes" element={<AdminRoute><Classes /></AdminRoute>} />
         <Route path="/students" element={<AdminRoute><Students /></AdminRoute>} />
         <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+        <Route path="/more" element={<AdminRoute><More /></AdminRoute>} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/payments" element={<Payments />} />
         <Route path="*" element={<Navigate to="/" />} />
