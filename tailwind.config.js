@@ -8,6 +8,15 @@ export default {
           600: "#a8841f",
         },
       },
+      keyframes: {
+        slideUp: {
+          "0%": { transform: "translateY(100%)" },
+          "100%": { transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "slide-up": "slideUp 0.25s ease-out",
+      },
     },
   },
   plugins: [],
