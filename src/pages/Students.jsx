@@ -1,9 +1,30 @@
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, where } from "firebase/firestore"
-import { Search } from "lucide-react"
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where } from "firebase/firestore"
+import { Search, Pencil } from "lucide-react"
 import { db } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
+
+function calculateAge(birthDate) {
+  if (!birthDate) return null
+  const today = new Date()
+  const birth = new Date(birthDate)
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
+  return age
+}
+
+const emptyForm = {
+  firstName: "",
+  lastName: "",
+  birthDate: "",
+  parentName: "",
+  parentPhone: "",
+  level: "",
+  classId: "",
+  enrollDate: new Date().toISOString().slice(0, 10),
+}
 
 export default function Students() {
   const [students, setStudents] = useState([])
@@ -11,13 +32,8 @@ export default function Students() {
   const [todayStatus, setTodayStatus] = useState({})
   const [search, setSearch] = useState("")
   const [sheetOpen, setSheetOpen] = useState(false)
-
-  const [name, setName] = useState("")
-  const [age, setAge] = useState("")
-  const [parentPhone, setParentPhone] = useState("")
-  const [level, setLevel] = useState("")
-  const [classId, setClassId] = useState("")
-  const [enrollDate, setEnrollDate] = useState(new Date().toISOString().slice(0, 10))
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -50,37 +66,59 @@ export default function Students() {
     return unsub
   }, [])
 
-  const resetForm = () => {
-    setName("")
-    setAge("")
-    setParentPhone("")
-    setLevel("")
-    setClassId("")
+  const openAdd = () => {
+    setEditingId(null)
+    setForm(emptyForm)
     setError("")
+    setSheetOpen(true)
   }
 
-  const handleAdd = async (e) => {
+  const openEdit = (s) => {
+    setEditingId(s.id)
+    setForm({
+      firstName: s.firstName || "",
+      lastName: s.lastName || "",
+      birthDate: s.birthDate || "",
+      parentName: s.parentName || "",
+      parentPhone: s.parentPhone || "",
+      level: s.level || "",
+      classId: s.classId || "",
+      enrollDate: s.enrollDate || new Date().toISOString().slice(0, 10),
+    })
+    setError("")
+    setSheetOpen(true)
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    if (!name.trim() || !age || !classId) {
-      setError("يرجى إدخال الاسم والسن واختيار القسم")
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.birthDate || !form.classId) {
+      setError("يرجى إدخال الإسم واللقب وتاريخ الولادة واختيار القسم")
       return
     }
-    const cls = classes.find((c) => c.id === classId)
+    const cls = classes.find((c) => c.id === form.classId)
+    const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`
+    const data = {
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      name: fullName,
+      birthDate: form.birthDate,
+      parentName: form.parentName.trim(),
+      parentPhone: form.parentPhone.trim(),
+      level: form.level.trim(),
+      classId: form.classId,
+      className: cls?.name || "",
+      enrollDate: form.enrollDate,
+    }
     try {
-      await addDoc(collection(db, "students"), {
-        name: name.trim(),
-        age: Number(age),
-        parentPhone: parentPhone.trim(),
-        level: level.trim(),
-        classId,
-        className: cls?.name || "",
-        enrollDate,
-      })
-      resetForm()
+      if (editingId) {
+        await updateDoc(doc(db, "students", editingId), data)
+      } else {
+        await addDoc(collection(db, "students"), data)
+      }
       setSheetOpen(false)
     } catch {
-      setError("حدث خطأ أثناء الإضافة")
+      setError("حدث خطأ أثناء الحفظ")
     }
   }
 
@@ -100,7 +138,7 @@ export default function Students() {
   }
 
   const filteredStudents = students.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase())
+    (s.name || "").toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -118,21 +156,33 @@ export default function Students() {
       </div>
 
       <div className="space-y-2">
-        {filteredStudents.map((s) => (
-          <div key={s.id} className="bg-white rounded-xl shadow-sm p-3">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <p className="font-medium text-sm">{s.name} ({s.age} سنة)</p>
-                <p className="text-xs text-gray-500">{s.className} — {s.level}</p>
-                <p className="text-xs text-gray-400">ولي الأمر: {s.parentPhone}</p>
+        {filteredStudents.map((s) => {
+          const age = calculateAge(s.birthDate)
+          return (
+            <div key={s.id} className="bg-white rounded-xl shadow-sm p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="font-medium text-sm">
+                    {s.name} {age !== null && `(${age} سنة)`}
+                  </p>
+                  <p className="text-xs text-gray-500">{s.className} — {s.level}</p>
+                  <p className="text-xs text-gray-400">
+                    الولي: {s.parentName || "-"} — {s.parentPhone || "-"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => openEdit(s)} className="text-emerald-700">
+                    <Pencil size={16} />
+                  </button>
+                  <button onClick={() => handleDelete(s.id)} className="text-red-600 text-xs">
+                    حذف
+                  </button>
+                </div>
               </div>
-              <button onClick={() => handleDelete(s.id)} className="text-red-600 text-xs">
-                حذف
-              </button>
+              {renderBadge(s.id)}
             </div>
-            {renderBadge(s.id)}
-          </div>
-        ))}
+          )
+        })}
         {filteredStudents.length === 0 && (
           <p className="text-gray-400 text-sm text-center py-6">
             {search ? "لا توجد نتائج" : "لا يوجد طلاب بعد"}
@@ -140,38 +190,57 @@ export default function Students() {
         )}
       </div>
 
-      <FAB onClick={() => setSheetOpen(true)} />
+      <FAB onClick={openAdd} />
 
-      <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="إضافة طالب">
-        <form onSubmit={handleAdd} className="space-y-3">
+      <BottomSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={editingId ? "تعديل بيانات الطالب" : "إضافة طالب"}
+      >
+        <form onSubmit={handleSubmit} className="space-y-3">
           <input
-            placeholder="الاسم الكامل"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            placeholder="الإسم"
+            value={form.firstName}
+            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
           <input
-            type="number"
-            placeholder="السن"
-            value={age}
-            onChange={(e) => setAge(e.target.value)}
+            placeholder="اللقب"
+            value={form.lastName}
+            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          />
+          <label className="block text-xs text-gray-500">تاريخ الولادة</label>
+          <input
+            type="date"
+            value={form.birthDate}
+            onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          />
+          {form.birthDate && (
+            <p className="text-xs text-emerald-700">السن: {calculateAge(form.birthDate)} سنة</p>
+          )}
+          <input
+            placeholder="اسم الولي"
+            value={form.parentName}
+            onChange={(e) => setForm({ ...form, parentName: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
           <input
-            placeholder="رقم هاتف ولي الأمر"
-            value={parentPhone}
-            onChange={(e) => setParentPhone(e.target.value)}
+            placeholder="رقم هاتف الولي"
+            value={form.parentPhone}
+            onChange={(e) => setForm({ ...form, parentPhone: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
           <input
             placeholder="المستوى القرآني"
-            value={level}
-            onChange={(e) => setLevel(e.target.value)}
+            value={form.level}
+            onChange={(e) => setForm({ ...form, level: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
           <select
-            value={classId}
-            onChange={(e) => setClassId(e.target.value)}
+            value={form.classId}
+            onChange={(e) => setForm({ ...form, classId: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           >
             <option value="">اختر القسم</option>
@@ -182,13 +251,13 @@ export default function Students() {
           <label className="block text-xs text-gray-500">تاريخ التسجيل</label>
           <input
             type="date"
-            value={enrollDate}
-            onChange={(e) => setEnrollDate(e.target.value)}
+            value={form.enrollDate}
+            onChange={(e) => setForm({ ...form, enrollDate: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
           {error && <p className="text-red-600 text-xs">{error}</p>}
           <button type="submit" className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium">
-            إضافة طالب
+            {editingId ? "حفظ التعديلات" : "إضافة طالب"}
           </button>
         </form>
       </BottomSheet>
