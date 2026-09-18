@@ -122,8 +122,13 @@ export default function Reports() {
     const rows = classStudents.map((s) => {
       const row = { "الطالب": s.name }
       records.forEach((r) => {
-        const present = r.records ? r.records[s.id] : undefined
-        row[r.date] = present === undefined ? "-" : (present ? "حاضر" : "غائب")
+        const beforeEnrollment = s.enrollDate && r.date < s.enrollDate
+        if (beforeEnrollment) {
+          row[r.date] = "-"
+        } else {
+          const present = r.records ? r.records[s.id] : undefined
+          row[r.date] = present === undefined ? "-" : (present ? "حاضر" : "غائب")
+        }
       })
       return row
     })
