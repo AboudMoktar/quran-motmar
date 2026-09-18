@@ -74,10 +74,13 @@ export default function Dashboard() {
 
   const classRate = (classId) => rateOf(marksInRange(attendance, startDate, endDate, classId))
 
-  const studentRate = (studentId) => {
+  const studentRate = (student) => {
+    const effectiveStart = student.enrollDate && student.enrollDate > startDate
+      ? student.enrollDate
+      : startDate
     const marks = attendance
-      .filter((a) => a.date >= startDate && a.date <= endDate && a.records && studentId in a.records)
-      .map((a) => a.records[studentId])
+      .filter((a) => a.date >= effectiveStart && a.date <= endDate && a.records && student.id in a.records)
+      .map((a) => a.records[student.id])
     return rateOf(marks)
   }
 
@@ -96,13 +99,16 @@ export default function Dashboard() {
   }
 
   const lowAttendanceStudents = students
-    .map((s) => ({ ...s, rate: studentRate(s.id) }))
+    .filter((s) => s.active !== false)
+    .map((s) => ({ ...s, rate: studentRate(s) }))
     .filter((s) => s.rate !== null && s.rate < LOW_ATTENDANCE_THRESHOLD)
     .sort((a, b) => a.rate - b.rate)
 
   const paidStudentIds = new Set(payments.map((p) => p.studentId))
-  const unpaidStudents = students.filter((s) => !paidStudentIds.has(s.id))
+  const unpaidStudents = students.filter((s) => s.active !== false && !paidStudentIds.has(s.id))
   const showPaymentAlert = dayOfMonth >= PAYMENT_ALERT_DAY
+
+  const activeStudentsCount = students.filter((s) => s.active !== false).length
 
   if (loading) {
     return <div className="text-center py-10 text-gray-500">جارٍ التحميل...</div>
@@ -127,9 +133,9 @@ export default function Dashboard() {
                   <p className="text-sm font-medium">{s.name}</p>
                   <p className="text-xs text-gray-500">{s.className}</p>
                 </div>
-                <span className="text-sm text-emerald-700 font-medium" dir="ltr">
+                <a href={`tel:${s.parentPhone}`} className="text-sm text-emerald-700 font-medium" dir="ltr">
                   {s.parentPhone || "-"}
-                </span>
+                </a>
               </div>
             ))}
           </div>
@@ -137,19 +143,19 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center">
-          <p className="text-2xl font-bold text-emerald-700">{students.length}</p>
-          <p className="text-xs text-gray-500">إجمالي الطلاب</p>
+        <div className="bg-white rounded-xl shadow-sm p-4 text-center border-t-4 border-gold-500">
+          <p className="text-2xl font-bold text-emerald-700">{activeStudentsCount}</p>
+          <p className="text-xs text-gray-500">الطلاب النشطون</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center">
+        <div className="bg-white rounded-xl shadow-sm p-4 text-center border-t-4 border-gold-500">
           <p className="text-2xl font-bold text-emerald-700">{classes.length}</p>
           <p className="text-xs text-gray-500">عدد الأقسام</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center">
+        <div className="bg-white rounded-xl shadow-sm p-4 text-center border-t-4 border-gold-500">
           <p className="text-2xl font-bold text-emerald-700">{teachers.length}</p>
           <p className="text-xs text-gray-500">عدد المعلمين</p>
         </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 text-center">
+        <div className="bg-white rounded-xl shadow-sm p-4 text-center border-t-4 border-gold-500">
           <p className="text-2xl font-bold text-emerald-700">
             {todayRate === null ? "-" : `${todayRate}%`}
           </p>
