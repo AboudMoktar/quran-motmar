@@ -3,17 +3,20 @@ import { collection, onSnapshot, query, where, doc, setDoc, getDocs } from "fire
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 
+const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
   thu: "الخميس", fri: "الجمعة", sat: "السبت"
 }
 
 export default function Attendance() {
-  const { user, role } = useAuth()
+  const { user, role, isAdminLevel } = useAuth()
   const [classes, setClasses] = useState([])
   const [classId, setClassId] = useState("")
   const [students, setStudents] = useState([])
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const today = new Date().toISOString().slice(0, 10)
+  const todayKey = DAY_KEYS[new Date().getDay()]
+  const [date, setDate] = useState(today)
   const [records, setRecords] = useState({})
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
@@ -106,6 +109,8 @@ export default function Attendance() {
   }, [classId, historyStudentId])
 
   const selectedClass = classes.find((c) => c.id === classId)
+  const classScheduledToday = selectedClass ? (selectedClass.days || []).includes(todayKey) : true
+  const canMark = isAdminLevel || (date === today && classScheduledToday)
 
   return (
     <div>
@@ -129,15 +134,27 @@ export default function Attendance() {
           </p>
         )}
 
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
-        />
+        {isAdminLevel ? (
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2 text-sm"
+          />
+        ) : (
+          <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600">
+            {date} (اليوم فقط)
+          </div>
+        )}
+
+        {selectedClass && !isAdminLevel && !classScheduledToday && (
+          <p className="text-red-600 text-xs">
+            لا يوجد حصة لهذا القسم اليوم — التسجيل متاح فقط في أيام الحصص المحددة
+          </p>
+        )}
       </div>
 
-      {classId && (
+      {classId && canMark && (
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <p className="text-sm font-medium mb-3">قائمة الطلاب</p>
           <div className="space-y-2">
