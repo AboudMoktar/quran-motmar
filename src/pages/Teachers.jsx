@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { collection, onSnapshot, doc, setDoc, deleteDoc } from "firebase/firestore"
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth"
-import { Search } from "lucide-react"
+import { Search, Eye, EyeOff } from "lucide-react"
 import { db, secondaryAuth, LOGIN_DOMAIN } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
@@ -13,6 +13,7 @@ export default function Teachers() {
 
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [error, setError] = useState("")
@@ -31,9 +32,15 @@ export default function Teachers() {
   const resetForm = () => {
     setUsername("")
     setPassword("")
+    setShowPassword(false)
     setName("")
     setPhone("")
     setError("")
+  }
+
+  const openAdd = () => {
+    resetForm()
+    setSheetOpen(true)
   }
 
   const handleAdd = async (e) => {
@@ -119,10 +126,24 @@ export default function Teachers() {
         )}
       </div>
 
-      <FAB onClick={() => setSheetOpen(true)} />
+      <FAB onClick={openAdd} />
 
-      <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="إضافة معلم">
-        <form onSubmit={handleAdd} className="space-y-3">
+      <BottomSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title="إضافة معلم"
+        footer={
+          <button
+            type="submit"
+            form="teacher-form"
+            disabled={loading}
+            className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-60"
+          >
+            {loading ? "جارٍ الإضافة..." : "إضافة معلم"}
+          </button>
+        }
+      >
+        <form id="teacher-form" onSubmit={handleAdd} className="space-y-3">
           <p className="text-xs text-gray-500">
             اختر اسم مستخدم وكلمة مرور للمعلم ليتمكن من تسجيل الدخول
           </p>
@@ -132,13 +153,22 @@ export default function Teachers() {
             onChange={(e) => setUsername(e.target.value)}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
-          <input
-            type="password"
-            placeholder="كلمة المرور"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="كلمة المرور"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 pl-10 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
           <input
             placeholder="الاسم الكامل"
             value={name}
@@ -152,13 +182,6 @@ export default function Teachers() {
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
           {error && <p className="text-red-600 text-xs">{error}</p>}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-60"
-          >
-            {loading ? "جارٍ الإضافة..." : "إضافة معلم"}
-          </button>
         </form>
       </BottomSheet>
     </div>
