@@ -1,7 +1,8 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "../firebase"
-import { ASSOCIATION_NAME, BRANCH_LABEL, MONTHLY_FEE } from "../config"
+import { ASSOCIATION_NAME, BRANCH_LABEL } from "../config"
+import { getMonthlyFee } from "./Settings"
 
 const MONTHS = ["01","02","03","04","05","06","07","08","09","10","11","12"]
 const MONTH_LABELS = {
@@ -21,7 +22,8 @@ function copyText(text, onDone) {
 
 export default function Messages() {
   const [startDate, setStartDate] = useState("")
-  const [startNotes, setStartNotes] = useState("")
+  const [startText, setStartText] = useState("")
+  const [startEdited, setStartEdited] = useState(false)
   const [startCopied, setStartCopied] = useState(false)
   const [numbersCopied, setNumbersCopied] = useState(false)
   const [enrolledRecipients, setEnrolledRecipients] = useState([])
@@ -30,23 +32,52 @@ export default function Messages() {
   const now = new Date()
   const [month, setMonth] = useState(MONTHS[now.getMonth()])
   const [year, setYear] = useState(String(now.getFullYear()))
+  const [monthlyFee, setMonthlyFee] = useState(null)
+  const [paymentText, setPaymentText] = useState("")
+  const [paymentEdited, setPaymentEdited] = useState(false)
   const [includeNames, setIncludeNames] = useState(false)
   const [paymentCopied, setPaymentCopied] = useState(false)
   const [paymentNumbersCopied, setPaymentNumbersCopied] = useState(false)
   const [loadingUnpaid, setLoadingUnpaid] = useState(false)
   const [unpaidRecipients, setUnpaidRecipients] = useState([])
 
-  const buildStartMessage = () => {
+  useEffect(() => {
+    getMonthlyFee().then(setMonthlyFee)
+  }, [])
+
+  const defaultStartMessage = () => {
     const dateLine = startDate ? `يوم ${startDate}` : ""
     return [
       `السلام عليكم أولياء الأمور الكرام،`,
       ``,
       `نعلمكم أن الدراسة القرآنية ${ASSOCIATION_NAME} ${BRANCH_LABEL} ستنطلق ${dateLine}.`,
-      startNotes.trim() ? startNotes.trim() : "",
       ``,
       `بارك الله فيكم`,
-    ].filter(Boolean).join("\n")
+    ].join("\n")
   }
+
+  useEffect(() => {
+    if (!startEdited) setStartText(defaultStartMessage())
+  }, [startDate])
+
+  const defaultPaymentMessage = (recipients) => {
+    if (monthlyFee === null) return ""
+    const lines = [
+      `السلام عليكم أولياء الأمور الكرام،`,
+      ``,
+      `نذكركم بضرورة تسديد الاشتراك الشهري لشهر ${MONTH_LABELS[month]} ${year} (${monthlyFee} د.ت) في أقرب وقت ممكن.`,
+    ]
+    if (includeNames && recipients.length > 0) {
+      lines.push(``, `الطلاب المعنيون:`)
+      recipients.forEach((r) => lines.push(`- ${r.name}`))
+    }
+    lines.push(``, `شكرًا لتعاونكم`)
+    return lines.join("\n")
+  }
+
+  useEffect(() => {
+    if (!paymentEdited) setPaymentText(defaultPaymentMessage(unpaidRecipients))
+  }, [month, year, includeNames, unpaidRecipients, monthlyFee])
 
   const loadEnrolled = async () => {
     if (enrolledRecipients.length > 0) return enrolledRecipients
@@ -89,23 +120,9 @@ export default function Messages() {
     }
   }
 
-  const buildPaymentMessage = (recipients) => {
-    const lines = [
-      `السلام عليكم أولياء الأمور الكرام،`,
-      ``,
-      `نذكركم بضرورة تسديد الاشتراك الشهري لشهر ${MONTH_LABELS[month]} ${year} (${MONTHLY_FEE} د.ت) في أقرب وقت ممكن.`,
-    ]
-    if (includeNames && recipients.length > 0) {
-      lines.push(``, `الطلاب المعنيون:`)
-      recipients.forEach((r) => lines.push(`- ${r.name}`))
-    }
-    lines.push(``, `شكرًا لتعاونكم`)
-    return lines.join("\n")
-  }
-
   const handleStartSms = async () => {
     const recipients = await loadEnrolled()
-    openSms(recipients.map((r) => r.phone), buildStartMessage())
+    openSms(recipients.map((r) => r.phone), startText)
   }
 
   const handleStartCopyNumbers = async () => {
@@ -118,7 +135,7 @@ export default function Messages() {
 
   const handlePaymentSms = async () => {
     const recipients = unpaidRecipients.length > 0 ? unpaidRecipients : await loadUnpaid()
-    openSms(recipients.map((r) => r.phone), buildPaymentMessage(recipients))
+    openSms(recipients.map((r) => r.phone), paymentText)
   }
 
   const handlePaymentCopyNumbers = async () => {
@@ -141,16 +158,21 @@ export default function Messages() {
           onChange={(e) => setStartDate(e.target.value)}
           className="w-full border rounded-lg px-3 py-2 text-sm"
         />
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">نص الرسالة (قابل للتعديل)</p>
+          <button
+            onClick={() => { setStartText(defaultStartMessage()); setStartEdited(false) }}
+            className="text-xs text-emerald-700"
+          >
+            استعادة النص الافتراضي
+          </button>
+        </div>
         <textarea
-          placeholder="ملاحظات إضافية (اختياري)"
-          value={startNotes}
-          onChange={(e) => setStartNotes(e.target.value)}
-          rows={3}
+          value={startText}
+          onChange={(e) => { setStartText(e.target.value); setStartEdited(true) }}
+          rows={6}
           className="w-full border rounded-lg px-3 py-2 text-sm"
         />
-        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 whitespace-pre-line">
-          {buildStartMessage()}
-        </div>
         <p className="text-xs text-gray-500">
           المستلمون: جميع أولياء أمور الطلاب النشطين ({enrolledRecipients.length > 0 ? `${enrolledRecipients.length} رقم` : "سيتم تحميلهم عند الإرسال"})
         </p>
@@ -163,7 +185,7 @@ export default function Messages() {
             {loadingEnrolled ? "جارٍ التحميل..." : "فتح الرسائل"}
           </button>
           <button
-            onClick={() => copyText(buildStartMessage(), () => { setStartCopied(true); setTimeout(() => setStartCopied(false), 2500) })}
+            onClick={() => copyText(startText, () => { setStartCopied(true); setTimeout(() => setStartCopied(false), 2500) })}
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
           >
             {startCopied ? "تم النسخ ✓" : "نسخ النص"}
@@ -204,9 +226,21 @@ export default function Messages() {
           />
           تضمين أسماء الطلاب في نص الرسالة
         </label>
-        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 whitespace-pre-line">
-          {buildPaymentMessage(unpaidRecipients)}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">نص الرسالة (قابل للتعديل)</p>
+          <button
+            onClick={() => { setPaymentText(defaultPaymentMessage(unpaidRecipients)); setPaymentEdited(false) }}
+            className="text-xs text-emerald-700"
+          >
+            استعادة النص الافتراضي
+          </button>
         </div>
+        <textarea
+          value={paymentText}
+          onChange={(e) => { setPaymentText(e.target.value); setPaymentEdited(true) }}
+          rows={6}
+          className="w-full border rounded-lg px-3 py-2 text-sm"
+        />
         <p className="text-xs text-gray-500">
           المستلمون: أولياء أمور الطلاب غير المسددين ({unpaidRecipients.length > 0 ? `${unpaidRecipients.length} رقم` : "سيتم تحميلهم عند الإرسال"})
         </p>
@@ -219,7 +253,7 @@ export default function Messages() {
             {loadingUnpaid ? "جارٍ التحميل..." : "فتح الرسائل"}
           </button>
           <button
-            onClick={() => copyText(buildPaymentMessage(unpaidRecipients), () => { setPaymentCopied(true); setTimeout(() => setPaymentCopied(false), 2500) })}
+            onClick={() => copyText(paymentText, () => { setPaymentCopied(true); setTimeout(() => setPaymentCopied(false), 2500) })}
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
           >
             {paymentCopied ? "تم النسخ ✓" : "نسخ النص"}
