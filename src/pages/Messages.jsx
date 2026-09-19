@@ -10,8 +10,8 @@ const MONTH_LABELS = {
   "09": "سبتمبر", "10": "أكتوبر", "11": "نوفمبر", "12": "ديسمبر"
 }
 
-function openSms(text) {
-  const url = `sms:?body=${encodeURIComponent(text)}`
+function openSms(numbers, text) {
+  const url = `sms:${numbers.join(",")}?body=${encodeURIComponent(text)}`
   window.location.href = url
 }
 
@@ -23,14 +23,18 @@ export default function Messages() {
   const [startDate, setStartDate] = useState("")
   const [startNotes, setStartNotes] = useState("")
   const [startCopied, setStartCopied] = useState(false)
+  const [numbersCopied, setNumbersCopied] = useState(false)
+  const [enrolledRecipients, setEnrolledRecipients] = useState([])
+  const [loadingEnrolled, setLoadingEnrolled] = useState(false)
 
   const now = new Date()
   const [month, setMonth] = useState(MONTHS[now.getMonth()])
   const [year, setYear] = useState(String(now.getFullYear()))
   const [includeNames, setIncludeNames] = useState(false)
   const [paymentCopied, setPaymentCopied] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [unpaidNames, setUnpaidNames] = useState([])
+  const [paymentNumbersCopied, setPaymentNumbersCopied] = useState(false)
+  const [loadingUnpaid, setLoadingUnpaid] = useState(false)
+  const [unpaidRecipients, setUnpaidRecipients] = useState([])
 
   const buildStartMessage = () => {
     const dateLine = startDate ? `يوم ${startDate}` : ""
@@ -44,8 +48,26 @@ export default function Messages() {
     ].filter(Boolean).join("\n")
   }
 
+  const loadEnrolled = async () => {
+    if (enrolledRecipients.length > 0) return enrolledRecipients
+    setLoadingEnrolled(true)
+    try {
+      const snap = await getDocs(collection(db, "students"))
+      const students = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((s) => s.active !== false && s.parentPhone && s.parentPhone.trim())
+      const recipients = students.map((s) => ({ name: s.name, phone: s.parentPhone.trim() }))
+      setEnrolledRecipients(recipients)
+      setLoadingEnrolled(false)
+      return recipients
+    } catch {
+      setLoadingEnrolled(false)
+      return []
+    }
+  }
+
   const loadUnpaid = async () => {
-    setLoading(true)
+    setLoadingUnpaid(true)
     try {
       const monthKey = `${year}-${month}`
       const [studentsSnap, paymentsSnap] = await Promise.all([
@@ -56,41 +78,55 @@ export default function Messages() {
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter((s) => s.active !== false)
       const paidIds = new Set(paymentsSnap.docs.map((d) => d.data().studentId))
-      const unpaid = students.filter((s) => !paidIds.has(s.id))
-      setUnpaidNames(unpaid.map((s) => s.name))
+      const unpaid = students.filter((s) => !paidIds.has(s.id) && s.parentPhone && s.parentPhone.trim())
+      const recipients = unpaid.map((s) => ({ name: s.name, phone: s.parentPhone.trim() }))
+      setUnpaidRecipients(recipients)
+      setLoadingUnpaid(false)
+      return recipients
     } catch {
-      setUnpaidNames([])
+      setLoadingUnpaid(false)
+      return []
     }
-    setLoading(false)
   }
 
-  const buildPaymentMessage = () => {
+  const buildPaymentMessage = (recipients) => {
     const lines = [
       `السلام عليكم أولياء الأمور الكرام،`,
       ``,
       `نذكركم بضرورة تسديد الاشتراك الشهري لشهر ${MONTH_LABELS[month]} ${year} (${MONTHLY_FEE} د.ت) في أقرب وقت ممكن.`,
     ]
-    if (includeNames && unpaidNames.length > 0) {
+    if (includeNames && recipients.length > 0) {
       lines.push(``, `الطلاب المعنيون:`)
-      unpaidNames.forEach((n) => lines.push(`- ${n}`))
+      recipients.forEach((r) => lines.push(`- ${r.name}`))
     }
     lines.push(``, `شكرًا لتعاونكم`)
     return lines.join("\n")
   }
 
-  const handlePaymentAction = async (action) => {
-    if (includeNames && unpaidNames.length === 0) {
-      await loadUnpaid()
-    }
-    const text = buildPaymentMessage()
-    if (action === "sms") {
-      openSms(text)
-    } else {
-      copyText(text, () => {
-        setPaymentCopied(true)
-        setTimeout(() => setPaymentCopied(false), 2500)
-      })
-    }
+  const handleStartSms = async () => {
+    const recipients = await loadEnrolled()
+    openSms(recipients.map((r) => r.phone), buildStartMessage())
+  }
+
+  const handleStartCopyNumbers = async () => {
+    const recipients = await loadEnrolled()
+    copyText(recipients.map((r) => r.phone).join(", "), () => {
+      setNumbersCopied(true)
+      setTimeout(() => setNumbersCopied(false), 2500)
+    })
+  }
+
+  const handlePaymentSms = async () => {
+    const recipients = unpaidRecipients.length > 0 ? unpaidRecipients : await loadUnpaid()
+    openSms(recipients.map((r) => r.phone), buildPaymentMessage(recipients))
+  }
+
+  const handlePaymentCopyNumbers = async () => {
+    const recipients = unpaidRecipients.length > 0 ? unpaidRecipients : await loadUnpaid()
+    copyText(recipients.map((r) => r.phone).join(", "), () => {
+      setPaymentNumbersCopied(true)
+      setTimeout(() => setPaymentNumbersCopied(false), 2500)
+    })
   }
 
   return (
@@ -115,12 +151,16 @@ export default function Messages() {
         <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 whitespace-pre-line">
           {buildStartMessage()}
         </div>
+        <p className="text-xs text-gray-500">
+          المستلمون: جميع أولياء أمور الطلاب النشطين ({enrolledRecipients.length > 0 ? `${enrolledRecipients.length} رقم` : "سيتم تحميلهم عند الإرسال"})
+        </p>
         <div className="flex gap-2">
           <button
-            onClick={() => openSms(buildStartMessage())}
-            className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm"
+            onClick={handleStartSms}
+            disabled={loadingEnrolled}
+            className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
           >
-            فتح الرسائل
+            {loadingEnrolled ? "جارٍ التحميل..." : "فتح الرسائل"}
           </button>
           <button
             onClick={() => copyText(buildStartMessage(), () => { setStartCopied(true); setTimeout(() => setStartCopied(false), 2500) })}
@@ -129,6 +169,12 @@ export default function Messages() {
             {startCopied ? "تم النسخ ✓" : "نسخ النص"}
           </button>
         </div>
+        <button
+          onClick={handleStartCopyNumbers}
+          className="w-full text-emerald-700 text-xs py-1"
+        >
+          {numbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
+        </button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
@@ -136,7 +182,7 @@ export default function Messages() {
         <div className="flex gap-2">
           <select
             value={month}
-            onChange={(e) => { setMonth(e.target.value); setUnpaidNames([]) }}
+            onChange={(e) => { setMonth(e.target.value); setUnpaidRecipients([]) }}
             className="flex-1 border rounded-lg px-3 py-2 text-sm"
           >
             {MONTHS.map((m) => (
@@ -146,7 +192,7 @@ export default function Messages() {
           <input
             type="number"
             value={year}
-            onChange={(e) => { setYear(e.target.value); setUnpaidNames([]) }}
+            onChange={(e) => { setYear(e.target.value); setUnpaidRecipients([]) }}
             className="w-24 border rounded-lg px-3 py-2 text-sm"
           />
         </div>
@@ -154,28 +200,37 @@ export default function Messages() {
           <input
             type="checkbox"
             checked={includeNames}
-            onChange={(e) => { setIncludeNames(e.target.checked); setUnpaidNames([]) }}
+            onChange={(e) => setIncludeNames(e.target.checked)}
           />
-          تضمين أسماء الطلاب غير المسددين (يُنصح بعدم التفعيل في رسالة جماعية)
+          تضمين أسماء الطلاب في نص الرسالة
         </label>
-        {loading && <p className="text-xs text-gray-400">جارٍ التحميل...</p>}
         <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600 whitespace-pre-line">
-          {buildPaymentMessage()}
+          {buildPaymentMessage(unpaidRecipients)}
         </div>
+        <p className="text-xs text-gray-500">
+          المستلمون: أولياء أمور الطلاب غير المسددين ({unpaidRecipients.length > 0 ? `${unpaidRecipients.length} رقم` : "سيتم تحميلهم عند الإرسال"})
+        </p>
         <div className="flex gap-2">
           <button
-            onClick={() => handlePaymentAction("sms")}
-            className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm"
+            onClick={handlePaymentSms}
+            disabled={loadingUnpaid}
+            className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
           >
-            فتح الرسائل
+            {loadingUnpaid ? "جارٍ التحميل..." : "فتح الرسائل"}
           </button>
           <button
-            onClick={() => handlePaymentAction("copy")}
+            onClick={() => copyText(buildPaymentMessage(unpaidRecipients), () => { setPaymentCopied(true); setTimeout(() => setPaymentCopied(false), 2500) })}
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
           >
             {paymentCopied ? "تم النسخ ✓" : "نسخ النص"}
           </button>
         </div>
+        <button
+          onClick={handlePaymentCopyNumbers}
+          className="w-full text-emerald-700 text-xs py-1"
+        >
+          {paymentNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
+        </button>
       </div>
     </div>
   )
