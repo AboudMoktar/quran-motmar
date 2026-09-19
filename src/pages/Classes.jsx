@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, where } from "firebase/firestore"
-import { Search } from "lucide-react"
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where } from "firebase/firestore"
+import { Search, Pencil } from "lucide-react"
 import { db } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
@@ -15,17 +15,15 @@ const DAYS = [
   { key: "sat", label: "السبت" },
 ]
 
+const emptyForm = { name: "", level: "", teacherId: "", days: [], time: "" }
+
 export default function Classes() {
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
   const [search, setSearch] = useState("")
   const [sheetOpen, setSheetOpen] = useState(false)
-
-  const [name, setName] = useState("")
-  const [level, setLevel] = useState("")
-  const [teacherId, setTeacherId] = useState("")
-  const [days, setDays] = useState([])
-  const [time, setTime] = useState("")
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -44,41 +42,57 @@ export default function Classes() {
   }, [])
 
   const toggleDay = (key) => {
-    setDays((prev) =>
-      prev.includes(key) ? prev.filter((d) => d !== key) : [...prev, key]
-    )
+    setForm((prev) => ({
+      ...prev,
+      days: prev.days.includes(key) ? prev.days.filter((d) => d !== key) : [...prev.days, key],
+    }))
   }
 
-  const resetForm = () => {
-    setName("")
-    setLevel("")
-    setTeacherId("")
-    setDays([])
-    setTime("")
+  const openAdd = () => {
+    setEditingId(null)
+    setForm(emptyForm)
     setError("")
+    setSheetOpen(true)
   }
 
-  const handleAdd = async (e) => {
+  const openEdit = (c) => {
+    setEditingId(c.id)
+    setForm({
+      name: c.name || "",
+      level: c.level || "",
+      teacherId: c.teacherId || "",
+      days: c.days || [],
+      time: c.time || "",
+    })
+    setError("")
+    setSheetOpen(true)
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    if (!name.trim() || !teacherId || days.length === 0 || !time) {
+    if (!form.name.trim() || !form.teacherId || form.days.length === 0 || !form.time) {
       setError("يرجى ملء جميع الحقول واختيار يوم واحد على الأقل")
       return
     }
-    const teacher = teachers.find((t) => t.id === teacherId)
+    const teacher = teachers.find((t) => t.id === form.teacherId)
+    const data = {
+      name: form.name.trim(),
+      level: form.level.trim(),
+      teacherId: form.teacherId,
+      teacherName: teacher?.name || "",
+      days: form.days,
+      time: form.time,
+    }
     try {
-      await addDoc(collection(db, "classes"), {
-        name: name.trim(),
-        level: level.trim(),
-        teacherId,
-        teacherName: teacher?.name || "",
-        days,
-        time,
-      })
-      resetForm()
+      if (editingId) {
+        await updateDoc(doc(db, "classes", editingId), data)
+      } else {
+        await addDoc(collection(db, "classes"), data)
+      }
       setSheetOpen(false)
     } catch {
-      setError("حدث خطأ أثناء الإضافة")
+      setError("حدث خطأ أثناء الحفظ")
     }
   }
 
@@ -117,9 +131,14 @@ export default function Classes() {
               <p className="text-xs text-gray-500">{c.level} - {c.teacherName}</p>
               <p className="text-xs text-gray-400">{dayLabels(c.days || [])} - {c.time}</p>
             </div>
-            <button onClick={() => handleDelete(c.id)} className="text-red-600 text-xs">
-              حذف
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={() => openEdit(c)} className="text-emerald-700">
+                <Pencil size={16} />
+              </button>
+              <button onClick={() => handleDelete(c.id)} className="text-red-600 text-xs">
+                حذف
+              </button>
+            </div>
           </div>
         ))}
         {filteredClasses.length === 0 && (
@@ -129,25 +148,34 @@ export default function Classes() {
         )}
       </div>
 
-      <FAB onClick={() => setSheetOpen(true)} />
+      <FAB onClick={openAdd} />
 
-      <BottomSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="إضافة قسم">
-        <form onSubmit={handleAdd} className="space-y-3">
+      <BottomSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={editingId ? "تعديل القسم" : "إضافة قسم"}
+        footer={
+          <button type="submit" form="class-form" className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium">
+            {editingId ? "حفظ التعديلات" : "إضافة قسم"}
+          </button>
+        }
+      >
+        <form id="class-form" onSubmit={handleSubmit} className="space-y-3">
           <input
             placeholder="اسم القسم"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
           <input
             placeholder="المستوى"
-            value={level}
-            onChange={(e) => setLevel(e.target.value)}
+            value={form.level}
+            onChange={(e) => setForm({ ...form, level: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
           <select
-            value={teacherId}
-            onChange={(e) => setTeacherId(e.target.value)}
+            value={form.teacherId}
+            onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           >
             <option value="">اختر المعلم</option>
@@ -164,7 +192,7 @@ export default function Classes() {
                 key={d.key}
                 onClick={() => toggleDay(d.key)}
                 className={`px-3 py-1 rounded-full text-xs border ${
-                  days.includes(d.key)
+                  form.days.includes(d.key)
                     ? "bg-emerald-700 text-white border-emerald-700"
                     : "bg-white text-gray-600 border-gray-300"
                 }`}
@@ -177,15 +205,12 @@ export default function Classes() {
           <label className="block text-sm text-gray-600">وقت الحصة</label>
           <input
             type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
+            value={form.time}
+            onChange={(e) => setForm({ ...form, time: e.target.value })}
             className="w-full border rounded-lg px-3 py-2 text-sm"
           />
 
           {error && <p className="text-red-600 text-xs">{error}</p>}
-          <button type="submit" className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium">
-            إضافة قسم
-          </button>
         </form>
       </BottomSheet>
     </div>
