@@ -1,12 +1,27 @@
+import { Link, useLocation } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { LOGO_BASE64 } from "../assets/logo"
 import { ASSOCIATION_NAME, BRANCH_LABEL } from "../config"
 import BottomNav from "./BottomNav"
 
-const ROLE_LABELS = { admin: "مدير", teacher: "معلم" }
+const ROLE_LABELS = { admin: "مدير", staff: "إداري", teacher: "معلم" }
 
 export default function Layout({ children }) {
-  const { role, name, logout } = useAuth()
+  const { role, name, logout, isAdminLevel } = useAuth()
+  const location = useLocation()
+
+  const adminLinks = [
+    { to: "/dashboard", label: "لوحة التحكم" },
+    { to: "/teachers", label: "الفريق" },
+    { to: "/classes", label: "الأقسام" },
+    { to: "/students", label: "الطلاب" },
+    { to: "/reports", label: "التقارير" },
+  ]
+  const commonLinks = [
+    { to: "/attendance", label: "الحضور" },
+    { to: "/payments", label: "الاشتراكات" },
+  ]
+  const links = isAdminLevel ? [...adminLinks, ...commonLinks] : commonLinks
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -31,9 +46,13 @@ export default function Layout({ children }) {
         </p>
       </header>
 
+      {location.pathname !== "/dashboard" && location.pathname !== "/attendance" && (
+        <nav className="hidden">{links.length}</nav>
+      )}
+
       <main className="p-4 pb-20">{children}</main>
 
-      <BottomNav role={role} />
+      <BottomNav isAdminLevel={isAdminLevel} />
     </div>
   )
 }
