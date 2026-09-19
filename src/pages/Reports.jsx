@@ -3,6 +3,7 @@ import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection } from "../utils/printReport"
+import { surahName, progressPercent } from "../utils/quran"
 
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
@@ -16,8 +17,13 @@ export default function Reports() {
   const [attClassId, setAttClassId] = useState("")
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
+  const [progClassId, setProgClassId] = useState("")
+  const [progStart, setProgStart] = useState(new Date().toISOString().slice(0, 10))
+  const [progEnd, setProgEnd] = useState(new Date().toISOString().slice(0, 10))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [progError, setProgError] = useState("")
+  const [progLoading, setProgLoading] = useState(false)
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
@@ -185,6 +191,87 @@ export default function Reports() {
     setLoading(false)
   }
 
+  const loadProgressPivot = async () => {
+    const snap = await getDocs(
+      query(collection(db, "progress"), where("classId", "==", progClassId))
+    )
+    const cls = classes.find((c) => c.id === progClassId)
+    const classStudents = students.filter((s) => s.classId === progClassId)
+
+    const records = snap.docs
+      .map((d) => d.data())
+      .filter((p) => p.date >= progStart && p.date <= progEnd)
+      .sort((a, b) => (a.date > b.date ? 1 : -1))
+
+    const rows = classStudents.map((s) => {
+      const row = { "الطالب": s.name }
+      records.forEach((r) => {
+        const rec = r.records ? r.records[s.id] : undefined
+        if (!rec) {
+          row[r.date] = "-"
+        } else {
+          const parts = []
+          if (rec.surah) parts.push(`${surahName(rec.surah)} (${progressPercent(rec.surah)}%)`)
+          if (rec.hifz) parts.push(`حفظ: ${rec.hifz}`)
+          if (rec.tajwid) parts.push(`تجويد: ${rec.tajwid}`)
+          row[r.date] = parts.length > 0 ? parts.join(" / ") : "-"
+        }
+      })
+      return row
+    })
+
+    return {
+      rows,
+      hasDates: records.length > 0,
+      className: cls?.name || "",
+      teacherName: cls?.teacherName || "",
+    }
+  }
+
+  const handleProgressExcel = async () => {
+    setProgLoading(true)
+    setProgError("")
+    try {
+      const { rows, hasDates, className, teacherName } = await loadProgressPivot()
+      if (!hasDates || rows.length === 0) {
+        setProgError("لا يوجد سجل تقدم في هذه الفترة")
+      } else {
+        exportExcel("quran_progress", rows, [
+          `القسم: ${className}`,
+          `المعلم: ${teacherName}`,
+          `الفترة: من ${progStart} إلى ${progEnd}`,
+        ])
+      }
+    } catch {
+      setProgError("حدث خطأ أثناء تحميل البيانات")
+    }
+    setProgLoading(false)
+  }
+
+  const handleProgressPrint = async () => {
+    setProgLoading(true)
+    setProgError("")
+    try {
+      const { rows, hasDates, className, teacherName } = await loadProgressPivot()
+      if (!hasDates || rows.length === 0) {
+        setProgError("لا يوجد سجل تقدم في هذه الفترة")
+      } else {
+        printReport({
+          title: "سجل التقدم القرآني",
+          subtitleLines: [
+            `القسم: ${className}`,
+            `المعلم: ${teacherName}`,
+            `الفترة: من ${progStart} إلى ${progEnd}`,
+          ],
+          rows,
+        })
+      }
+    } catch {
+      setProgError("حدث خطأ أثناء تحميل البيانات")
+    }
+    setProgLoading(false)
+  }
+
   return (
     <div>
       <h2 className="text-lg font-bold mb-4">التقارير</h2>
@@ -253,7 +340,7 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
         <p className="font-medium text-sm">سجل الحضور</p>
         <select
           value={attClassId}
@@ -294,6 +381,51 @@ export default function Reports() {
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
           >
             {loading ? "..." : "PDF / طباعة"}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm">سجل التقدم القرآني</p>
+        <select
+          value={progClassId}
+          onChange={(e) => setProgClassId(e.target.value)}
+          className="w-full border rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">اختر القسم</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={progStart}
+            onChange={(e) => setProgStart(e.target.value)}
+            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          />
+          <input
+            type="date"
+            value={progEnd}
+            onChange={(e) => setProgEnd(e.target.value)}
+            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        {progError && <p className="text-red-600 text-xs">{progError}</p>}
+        <div className="flex gap-2">
+          <button
+            onClick={handleProgressExcel}
+            disabled={!progClassId || progLoading}
+            className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
+          >
+            {progLoading ? "..." : "Excel"}
+          </button>
+          <button
+            onClick={handleProgressPrint}
+            disabled={!progClassId || progLoading}
+            className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
+          >
+            {progLoading ? "..." : "PDF / طباعة"}
           </button>
         </div>
       </div>
