@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom"
-import { Users, FileBarChart, Wallet, BookMarked, ChevronLeft } from "lucide-react"
+import { Users, FileBarChart, Wallet, BookMarked, MessageCircle, ChevronLeft } from "lucide-react"
 
 const ITEMS = [
   { to: "/teachers", label: "الفريق", icon: Users },
   { to: "/progress", label: "التقدم القرآني", icon: BookMarked },
   { to: "/reports", label: "التقارير", icon: FileBarChart },
   { to: "/payments", label: "الاشتراكات", icon: Wallet },
+  { to: "/messages", label: "الرسائل", icon: MessageCircle },
 ]
 
 export default function More() {
