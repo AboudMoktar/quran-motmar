@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import { onAuthStateChanged, signOut } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { auth, db } from "../firebase"
 
 const AuthContext = createContext(null)
@@ -28,10 +28,21 @@ export function AuthProvider({ children }) {
     return unsubscribe
   }, [])
 
+  useEffect(() => {
+    if (!user) return
+    const ping = () => {
+      updateDoc(doc(db, "users", user.uid), { lastActive: Date.now() }).catch(() => {})
+    }
+    ping()
+    const interval = setInterval(ping, 90000)
+    return () => clearInterval(interval)
+  }, [user])
+
   const logout = () => signOut(auth)
+  const isAdminLevel = role === "admin" || role === "staff"
 
   return (
-    <AuthContext.Provider value={{ user, role, name, loading, logout }}>
+    <AuthContext.Provider value={{ user, role, name, loading, logout, isAdminLevel }}>
       {children}
     </AuthContext.Provider>
   )
