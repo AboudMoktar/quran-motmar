@@ -2,57 +2,7 @@ import { useEffect, useState } from "react"
 import { collection, onSnapshot, query, where, doc, setDoc, getDocs } from "firebase/firestore"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
-
-const SURAHS = [
-  { number: 114, name: "الناس" }, { number: 113, name: "الفلق" }, { number: 112, name: "الإخلاص" },
-  { number: 111, name: "المسد" }, { number: 110, name: "النصر" }, { number: 109, name: "الكافرون" },
-  { number: 108, name: "الكوثر" }, { number: 107, name: "الماعون" }, { number: 106, name: "قريش" },
-  { number: 105, name: "الفيل" }, { number: 104, name: "الهمزة" }, { number: 103, name: "العصر" },
-  { number: 102, name: "التكاثر" }, { number: 101, name: "القارعة" }, { number: 100, name: "العاديات" },
-  { number: 99, name: "الزلزلة" }, { number: 98, name: "البينة" }, { number: 97, name: "القدر" },
-  { number: 96, name: "العلق" }, { number: 95, name: "التين" }, { number: 94, name: "الشرح" },
-  { number: 93, name: "الضحى" }, { number: 92, name: "الليل" }, { number: 91, name: "الشمس" },
-  { number: 90, name: "البلد" }, { number: 89, name: "الفجر" }, { number: 88, name: "الغاشية" },
-  { number: 87, name: "الأعلى" }, { number: 86, name: "الطارق" }, { number: 85, name: "البروج" },
-  { number: 84, name: "الانشقاق" }, { number: 83, name: "المطففين" }, { number: 82, name: "الانفطار" },
-  { number: 81, name: "التكوير" }, { number: 80, name: "عبس" }, { number: 79, name: "النازعات" },
-  { number: 78, name: "النبأ" }, { number: 77, name: "المرسلات" }, { number: 76, name: "الإنسان" },
-  { number: 75, name: "القيامة" }, { number: 74, name: "المدثر" }, { number: 73, name: "المزمل" },
-  { number: 72, name: "الجن" }, { number: 71, name: "نوح" }, { number: 70, name: "المعارج" },
-  { number: 69, name: "الحاقة" }, { number: 68, name: "القلم" }, { number: 67, name: "الملك" },
-  { number: 66, name: "التحريم" }, { number: 65, name: "الطلاق" }, { number: 64, name: "التغابن" },
-  { number: 63, name: "المنافقون" }, { number: 62, name: "الجمعة" }, { number: 61, name: "الصف" },
-  { number: 60, name: "الممتحنة" }, { number: 59, name: "الحشر" }, { number: 58, name: "المجادلة" },
-  { number: 57, name: "الحديد" }, { number: 56, name: "الواقعة" }, { number: 55, name: "الرحمن" },
-  { number: 54, name: "القمر" }, { number: 53, name: "النجم" }, { number: 52, name: "الطور" },
-  { number: 51, name: "الذاريات" }, { number: 50, name: "ق" }, { number: 49, name: "الحجرات" },
-  { number: 48, name: "الفتح" }, { number: 47, name: "محمد" }, { number: 46, name: "الأحقاف" },
-  { number: 45, name: "الجاثية" }, { number: 44, name: "الدخان" }, { number: 43, name: "الزخرف" },
-  { number: 42, name: "الشورى" }, { number: 41, name: "فصلت" }, { number: 40, name: "غافر" },
-  { number: 39, name: "الزمر" }, { number: 38, name: "ص" }, { number: 37, name: "الصافات" },
-  { number: 36, name: "يس" }, { number: 35, name: "فاطر" }, { number: 34, name: "سبأ" },
-  { number: 33, name: "الأحزاب" }, { number: 32, name: "السجدة" }, { number: 31, name: "لقمان" },
-  { number: 30, name: "الروم" }, { number: 29, name: "العنكبوت" }, { number: 28, name: "القصص" },
-  { number: 27, name: "النمل" }, { number: 26, name: "الشعراء" }, { number: 25, name: "الفرقان" },
-  { number: 24, name: "النور" }, { number: 23, name: "المؤمنون" }, { number: 22, name: "الحج" },
-  { number: 21, name: "الأنبياء" }, { number: 20, name: "طه" }, { number: 19, name: "مريم" },
-  { number: 18, name: "الكهف" }, { number: 17, name: "الإسراء" }, { number: 16, name: "النحل" },
-  { number: 15, name: "الحجر" }, { number: 14, name: "إبراهيم" }, { number: 13, name: "الرعد" },
-  { number: 12, name: "يوسف" }, { number: 11, name: "هود" }, { number: 10, name: "يونس" },
-  { number: 9, name: "التوبة" }, { number: 8, name: "الأنفال" }, { number: 7, name: "الأعراف" },
-  { number: 6, name: "الأنعام" }, { number: 5, name: "المائدة" }, { number: 4, name: "النساء" },
-  { number: 3, name: "آل عمران" }, { number: 2, name: "البقرة" }, { number: 1, name: "الفاتحة" },
-]
-
-const TAJWID_OPTIONS = ["ممتاز", "جيد", "يحتاج إلى تحسين"]
-
-function surahName(num) {
-  return SURAHS.find((s) => s.number === num)?.name || "-"
-}
-
-function progressPercent(num) {
-  return Math.round(((115 - num) / 114) * 100)
-}
+import { SURAHS, TAJWID_OPTIONS, HIFZ_OPTIONS, surahName, progressPercent } from "../utils/quran"
 
 export default function Progress() {
   const { user, role } = useAuth()
@@ -64,7 +14,9 @@ export default function Progress() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
   const [historyStudentId, setHistoryStudentId] = useState("")
-  const [history, setHistory] = useState([])
+  const [studentHistory, setStudentHistory] = useState([])
+  const [classHistory, setClassHistory] = useState([])
+  const [openDates, setOpenDates] = useState({})
 
   useEffect(() => {
     const q = role === "teacher"
@@ -99,6 +51,20 @@ export default function Progress() {
     load()
   }, [classId, date])
 
+  useEffect(() => {
+    if (!classId) {
+      setClassHistory([])
+      return
+    }
+    const unsub = onSnapshot(query(collection(db, "progress"), where("classId", "==", classId)), (snap) => {
+      const list = snap.docs
+        .map((d) => d.data())
+        .sort((a, b) => (a.date < b.date ? 1 : -1))
+      setClassHistory(list)
+    })
+    return unsub
+  }, [classId])
+
   const setStudentField = (studentId, field, value) => {
     setRecords((prev) => ({
       ...prev,
@@ -125,7 +91,7 @@ export default function Progress() {
 
   useEffect(() => {
     if (!classId || !historyStudentId) {
-      setHistory([])
+      setStudentHistory([])
       return
     }
     const load = async () => {
@@ -135,10 +101,16 @@ export default function Progress() {
         .filter((p) => historyStudentId in (p.records || {}))
         .map((p) => ({ date: p.date, ...p.records[historyStudentId] }))
         .sort((a, b) => (a.date < b.date ? 1 : -1))
-      setHistory(list)
+      setStudentHistory(list)
     }
     load()
   }, [classId, historyStudentId])
+
+  const toggleDate = (d) => {
+    setOpenDates((prev) => ({ ...prev, [d]: !prev[d] }))
+  }
+
+  const studentName = (id) => students.find((s) => s.id === id)?.name || id
 
   return (
     <div>
@@ -172,7 +144,7 @@ export default function Progress() {
 
       {classId && (
         <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <p className="text-sm font-medium mb-3">تسجيل التقدم</p>
+          <p className="text-sm font-medium mb-3">تسجيل التقدم — {date}</p>
           <div className="space-y-4">
             {students.map((s) => {
               const rec = records[s.id] || {}
@@ -191,6 +163,26 @@ export default function Progress() {
                       </option>
                     ))}
                   </select>
+
+                  <p className="text-xs text-gray-500 mb-1">تقييم الحفظ</p>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    {HIFZ_OPTIONS.map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setStudentField(s.id, "hifz", opt)}
+                        className={`py-1.5 rounded-lg text-xs border ${
+                          rec.hifz === opt
+                            ? "bg-emerald-700 text-white border-emerald-700"
+                            : "bg-white text-gray-600 border-gray-300"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-xs text-gray-500 mb-1">تقييم التجويد</p>
                   <div className="flex gap-2">
                     {TAJWID_OPTIONS.map((opt) => (
                       <button
@@ -228,7 +220,7 @@ export default function Progress() {
       )}
 
       {classId && students.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
           <p className="text-sm font-medium mb-3">سجل تقدم طالب</p>
           <select
             value={historyStudentId}
@@ -243,19 +235,66 @@ export default function Progress() {
 
           {historyStudentId && (
             <div className="space-y-2">
-              {history.map((h, i) => (
-                <div key={i} className="flex items-center justify-between text-sm border-b py-2 last:border-0">
-                  <span className="text-gray-500">{h.date}</span>
-                  <span>{h.surah ? surahName(h.surah) : "-"}</span>
-                  <span className="text-emerald-700">{h.surah ? `${progressPercent(h.surah)}%` : "-"}</span>
-                  <span className="text-xs text-gray-500">{h.tajwid || "-"}</span>
+              {studentHistory.map((h, i) => (
+                <div key={i} className="border-b pb-2 last:border-0">
+                  <p className="text-xs text-gray-500 mb-1">{h.date}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700">
+                      {h.surah ? `${surahName(h.surah)} (${progressPercent(h.surah)}%)` : "لم يسجل"}
+                    </span>
+                    {h.hifz && (
+                      <span className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600">حفظ: {h.hifz}</span>
+                    )}
+                    {h.tajwid && (
+                      <span className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-600">تجويد: {h.tajwid}</span>
+                    )}
+                  </div>
                 </div>
               ))}
-              {history.length === 0 && (
+              {studentHistory.length === 0 && (
                 <p className="text-gray-400 text-xs text-center py-3">لا يوجد سجل بعد</p>
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {classId && (
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <p className="text-sm font-medium mb-3">سجل القسم الكامل</p>
+          <div className="space-y-2">
+            {classHistory.map((entry) => {
+              const count = Object.keys(entry.records || {}).length
+              return (
+                <div key={entry.date} className="border rounded-lg p-3">
+                  <button
+                    onClick={() => toggleDate(entry.date)}
+                    className="w-full flex items-center justify-between text-right"
+                  >
+                    <span className="text-sm font-medium">{entry.date}</span>
+                    <span className="text-xs text-gray-500">{count} طالب</span>
+                  </button>
+                  {openDates[entry.date] && (
+                    <div className="mt-2 pt-2 border-t space-y-2">
+                      {Object.entries(entry.records || {}).map(([sid, rec]) => (
+                        <div key={sid} className="text-xs">
+                          <p className="font-medium text-gray-700 mb-0.5">{studentName(sid)}</p>
+                          <p className="text-gray-500">
+                            {rec.surah ? `${surahName(rec.surah)} (${progressPercent(rec.surah)}%)` : "-"}
+                            {rec.hifz ? ` — حفظ: ${rec.hifz}` : ""}
+                            {rec.tajwid ? ` — تجويد: ${rec.tajwid}` : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+            {classHistory.length === 0 && (
+              <p className="text-gray-400 text-xs text-center py-3">لا يوجد سجل بعد لهذا القسم</p>
+            )}
+          </div>
         </div>
       )}
     </div>
