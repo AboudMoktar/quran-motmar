@@ -3,7 +3,7 @@ import { collection, onSnapshot, query, where, doc, setDoc, deleteDoc } from "fi
 import { Search } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
-import { MONTHLY_FEE } from "../config"
+import { getMonthlyFee } from "./Settings"
 
 const MONTHS = [
   "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"
@@ -20,6 +20,7 @@ export default function Payments() {
   const [classId, setClassId] = useState("")
   const [students, setStudents] = useState([])
   const [search, setSearch] = useState("")
+  const [monthlyFee, setMonthlyFee] = useState(null)
   const now = new Date()
   const [year, setYear] = useState(String(now.getFullYear()))
   const [month, setMonth] = useState(MONTHS[now.getMonth()])
@@ -29,6 +30,10 @@ export default function Payments() {
   const [message, setMessage] = useState("")
 
   const monthKey = `${year}-${month}`
+
+  useEffect(() => {
+    getMonthlyFee().then(setMonthlyFee)
+  }, [])
 
   useEffect(() => {
     const q = role === "teacher"
@@ -68,6 +73,7 @@ export default function Payments() {
   }, [classId, monthKey])
 
   const togglePaid = async (student) => {
+    if (monthlyFee === null) return
     const paymentId = `${student.id}_${monthKey}`
     setMessage("")
 
@@ -78,14 +84,14 @@ export default function Payments() {
       setMessage(`تم إلغاء تسجيل الدفع لـ ${student.name}`)
     } else {
       const confirmed = confirm(
-        `تأكيد استلام اشتراك ${student.name} لشهر ${MONTH_LABELS[month]} ${year} بمبلغ ${MONTHLY_FEE} د.ت؟`
+        `تأكيد استلام اشتراك ${student.name} لشهر ${MONTH_LABELS[month]} ${year} بمبلغ ${monthlyFee} د.ت؟`
       )
       if (!confirmed) return
       await setDoc(doc(db, "payments", paymentId), {
         studentId: student.id,
         classId,
         month: monthKey,
-        amount: MONTHLY_FEE,
+        amount: monthlyFee,
         paidDate: new Date().toISOString().slice(0, 10),
       })
       setMessage(`تم تأكيد استلام اشتراك ${student.name} بنجاح ✅`)
@@ -145,7 +151,9 @@ export default function Payments() {
             className="w-24 border rounded-lg px-3 py-2 text-sm"
           />
         </div>
-        <p className="text-xs text-gray-500">قيمة الاشتراك الشهري: {MONTHLY_FEE} د.ت</p>
+        <p className="text-xs text-gray-500">
+          قيمة الاشتراك الشهري: {monthlyFee === null ? "..." : `${monthlyFee} د.ت`}
+        </p>
       </div>
 
       {message && (
