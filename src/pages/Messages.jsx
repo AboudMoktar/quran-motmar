@@ -10,9 +10,9 @@ const MONTH_LABELS = {
   "09": "سبتمبر", "10": "أكتوبر", "11": "نوفمبر", "12": "ديسمبر"
 }
 
-function openWhatsapp(text) {
-  const url = `https://wa.me/?text=${encodeURIComponent(text)}`
-  window.open(url, "_blank")
+function openSms(text) {
+  const url = `sms:?body=${encodeURIComponent(text)}`
+  window.location.href = url
 }
 
 function copyText(text, onDone) {
@@ -83,8 +83,8 @@ export default function Messages() {
       await loadUnpaid()
     }
     const text = buildPaymentMessage()
-    if (action === "whatsapp") {
-      openWhatsapp(text)
+    if (action === "sms") {
+      openSms(text)
     } else {
       copyText(text, () => {
         setPaymentCopied(true)
@@ -117,10 +117,10 @@ export default function Messages() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => openWhatsapp(buildStartMessage())}
+            onClick={() => openSms(buildStartMessage())}
             className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm"
           >
-            فتح واتساب
+            فتح الرسائل
           </button>
           <button
             onClick={() => copyText(buildStartMessage(), () => { setStartCopied(true); setTimeout(() => setStartCopied(false), 2500) })}
@@ -164,10 +164,10 @@ export default function Messages() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => handlePaymentAction("whatsapp")}
+            onClick={() => handlePaymentAction("sms")}
             className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm"
           >
-            فتح واتساب
+            فتح الرسائل
           </button>
           <button
             onClick={() => handlePaymentAction("copy")}
