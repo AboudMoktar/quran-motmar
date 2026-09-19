@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom"
-import { Presentation, FileBarChart, Wallet, ChevronLeft } from "lucide-react"
+import { Presentation, FileBarChart, Wallet, BookMarked, ChevronLeft } from "lucide-react"
 
 const ITEMS = [
   { to: "/teachers", label: "المعلمون", icon: Presentation },
+  { to: "/progress", label: "التقدم القرآني", icon: BookMarked },
   { to: "/reports", label: "التقارير", icon: FileBarChart },
   { to: "/payments", label: "الاشتراكات", icon: Wallet },
 ]
