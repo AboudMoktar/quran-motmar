@@ -11,6 +11,7 @@ const ADMIN_TABS = [
 
 const TEACHER_TABS = [
   { to: "/attendance", label: "الحضور", icon: CalendarCheck },
+  { to: "/progress", label: "التقدم", icon: BookOpen },
   { to: "/payments", label: "الاشتراكات", icon: Users },
 ]
 
@@ -20,7 +21,7 @@ export default function BottomNav({ role }) {
 
   const isActive = (to) => {
     if (to === "/more") {
-      return ["/teachers", "/reports", "/payments", "/more"].includes(location.pathname)
+      return ["/teachers", "/reports", "/payments", "/progress", "/more"].includes(location.pathname)
     }
     return location.pathname === to
   }
