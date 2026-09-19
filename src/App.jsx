@@ -10,6 +10,7 @@ import Attendance from "./pages/Attendance"
 import Payments from "./pages/Payments"
 import Progress from "./pages/Progress"
 import Reports from "./pages/Reports"
+import Messages from "./pages/Messages"
 import More from "./pages/More"
 
 function AdminRoute({ children }) {
@@ -41,6 +42,7 @@ function AppContent() {
         <Route path="/classes" element={<AdminRoute><Classes /></AdminRoute>} />
         <Route path="/students" element={<AdminRoute><Students /></AdminRoute>} />
         <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+        <Route path="/messages" element={<AdminRoute><Messages /></AdminRoute>} />
         <Route path="/more" element={<AdminRoute><More /></AdminRoute>} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/payments" element={<Payments />} />
