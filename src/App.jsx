@@ -13,13 +13,13 @@ import Reports from "./pages/Reports"
 import More from "./pages/More"
 
 function AdminRoute({ children }) {
-  const { role } = useAuth()
-  return role === "admin" ? children : <Navigate to="/" />
+  const { isAdminLevel } = useAuth()
+  return isAdminLevel ? children : <Navigate to="/" />
 }
 
 function Home() {
-  const { role } = useAuth()
-  if (role === "admin") return <Navigate to="/dashboard" />
+  const { isAdminLevel } = useAuth()
+  if (isAdminLevel) return <Navigate to="/dashboard" />
   return <Navigate to="/attendance" />
 }
 
