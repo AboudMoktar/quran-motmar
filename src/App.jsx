@@ -8,6 +8,7 @@ import Classes from "./pages/Classes"
 import Students from "./pages/Students"
 import Attendance from "./pages/Attendance"
 import Payments from "./pages/Payments"
+import Progress from "./pages/Progress"
 import Reports from "./pages/Reports"
 import More from "./pages/More"
 
@@ -43,6 +44,7 @@ function AppContent() {
         <Route path="/more" element={<AdminRoute><More /></AdminRoute>} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/payments" element={<Payments />} />
+        <Route path="/progress" element={<Progress />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>
