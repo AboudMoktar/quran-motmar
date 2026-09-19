@@ -15,9 +15,9 @@ const TEACHER_TABS = [
   { to: "/payments", label: "الاشتراكات", icon: Users },
 ]
 
-export default function BottomNav({ role }) {
+export default function BottomNav({ isAdminLevel }) {
   const location = useLocation()
-  const tabs = role === "admin" ? ADMIN_TABS : TEACHER_TABS
+  const tabs = isAdminLevel ? ADMIN_TABS : TEACHER_TABS
 
   const isActive = (to) => {
     if (to === "/more") {
