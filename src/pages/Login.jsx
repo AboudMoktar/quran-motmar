@@ -1,11 +1,13 @@
 import { useState } from "react"
 import { signInWithEmailAndPassword } from "firebase/auth"
+import { Eye, EyeOff } from "lucide-react"
 import { auth, LOGIN_DOMAIN } from "../firebase"
 import { ASSOCIATION_NAME, BRANCH_LABEL } from "../config"
 
 export default function Login() {
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -46,13 +48,22 @@ export default function Login() {
         />
 
         <label className="block text-sm text-gray-600 mb-1">كلمة المرور</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          className="w-full border rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-        />
+        <div className="relative mb-4">
+          <input
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full border rounded-lg px-3 py-2 pl-10 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          >
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        </div>
 
         {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
