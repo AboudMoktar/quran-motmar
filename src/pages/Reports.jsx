@@ -1,42 +1,13 @@
-
 import { useEffect, useState } from "react"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection } from "../utils/printReport"
 import { surahName, progressPercent } from "../utils/quran"
-import { getMonthlyFee } from "./Settings"
 
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
   thu: "الخميس", fri: "الجمعة", sat: "السبت"
-}
-const MONTH_LABELS = {
-  "01": "جانفي", "02": "فيفري", "03": "مارس", "04": "أفريل",
-  "05": "ماي", "06": "جوان", "07": "جويلية", "08": "أوت",
-  "09": "سبتمبر", "10": "أكتوبر", "11": "نوفمبر", "12": "ديسمبر"
-}
-
-function monthLabel(monthKey) {
-  const [y, m] = monthKey.split("-")
-  return `${MONTH_LABELS[m] || m} ${y}`
-}
-
-function monthsInRange(startKey, endKey) {
-  const months = []
-  let [y, m] = startKey.split("-").map(Number)
-  const [ey, em] = endKey.split("-").map(Number)
-  while (y < ey || (y === ey && m <= em)) {
-    months.push(`${y}-${String(m).padStart(2, "0")}`)
-    m++
-    if (m > 12) { m = 1; y++ }
-  }
-  return months
-}
-
-function lastDayOfMonth(monthKey) {
-  const [y, m] = monthKey.split("-").map(Number)
-  return new Date(y, m, 0).toISOString().slice(0, 10)
 }
 
 export default function Reports() {
@@ -53,13 +24,6 @@ export default function Reports() {
   const [error, setError] = useState("")
   const [progError, setProgError] = useState("")
   const [progLoading, setProgLoading] = useState(false)
-
-  const nowMonthKey = new Date().toISOString().slice(0, 7)
-  const [finStart, setFinStart] = useState(nowMonthKey)
-  const [finEnd, setFinEnd] = useState(nowMonthKey)
-  const [finLoading, setFinLoading] = useState(false)
-  const [finError, setFinError] = useState("")
-  const [finSummary, setFinSummary] = useState(null)
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
@@ -308,151 +272,6 @@ export default function Reports() {
     setProgLoading(false)
   }
 
-  const loadFinancialData = async () => {
-    if (finStart > finEnd) {
-      setFinError("الشهر الأول يجب أن يكون قبل الشهر الأخير")
-      return null
-    }
-    setFinLoading(true)
-    setFinError("")
-    try {
-      const [snap, allStudentsSnap, allClassesSnap, fee] = await Promise.all([
-        getDocs(collection(db, "payments")),
-        getDocs(collection(db, "students")),
-        getDocs(collection(db, "classes")),
-        getMonthlyFee(),
-      ])
-      const studentMap = {}
-      allStudentsSnap.docs.forEach((d) => { studentMap[d.id] = d.data() })
-      const classMap = {}
-      allClassesSnap.docs.forEach((d) => { classMap[d.id] = d.data().name })
-
-      const months = monthsInRange(finStart, finEnd)
-
-      const payments = snap.docs
-        .map((d) => d.data())
-        .filter((p) => p.month >= finStart && p.month <= finEnd)
-
-      const total = payments.reduce((sum, p) => sum + (p.amount || 0), 0)
-      const count = payments.length
-
-      const byClass = {}
-      payments.forEach((p) => {
-        const name = classMap[p.classId] || "غير محدد"
-        if (!byClass[name]) byClass[name] = { total: 0, count: 0 }
-        byClass[name].total += p.amount || 0
-        byClass[name].count += 1
-      })
-
-      const byMonth = {}
-      months.forEach((mk) => { byMonth[mk] = { real: 0, count: 0, expected: 0, expectedCount: 0 } })
-      payments.forEach((p) => {
-        if (!byMonth[p.month]) byMonth[p.month] = { real: 0, count: 0, expected: 0, expectedCount: 0 }
-        byMonth[p.month].real += p.amount || 0
-        byMonth[p.month].count += 1
-      })
-
-      months.forEach((mk) => {
-        const cutoff = lastDayOfMonth(mk)
-        const activeCount = students.filter(
-          (s) => s.active !== false && (!s.enrollDate || s.enrollDate <= cutoff)
-        ).length
-        byMonth[mk].expected = activeCount * fee
-        byMonth[mk].expectedCount = activeCount
-      })
-
-      const totalExpected = Object.values(byMonth).reduce((sum, v) => sum + v.expected, 0)
-
-      const detailRows = payments
-        .map((p) => ({
-          "الطالب": studentMap[p.studentId]?.name || "طالب محذوف",
-          "القسم": classMap[p.classId] || "قسم محذوف",
-          "الشهر": monthLabel(p.month),
-          "المبلغ": p.amount,
-          "تاريخ الدفع": p.paidDate,
-        }))
-        .sort((a, b) => (a["تاريخ الدفع"] < b["تاريخ الدفع"] ? 1 : -1))
-
-      const summary = { total, count, totalExpected, byClass, byMonth, months, fee, detailRows }
-      setFinSummary(summary)
-      setFinLoading(false)
-      return summary
-    } catch {
-      setFinError("حدث خطأ أثناء تحميل البيانات")
-      setFinLoading(false)
-      return null
-    }
-  }
-
-  const handleFinancialExcel = async () => {
-    const summary = finSummary || (await loadFinancialData())
-    if (!summary) return
-    if (summary.count === 0) {
-      setFinError("لا يوجد اشتراكات مدفوعة في هذه الفترة")
-      return
-    }
-    const overviewRows = [{
-      "إجمالي الإيرادات الفعلية (د.ت)": summary.total,
-      "إجمالي الإيرادات المتوقعة (د.ت)": summary.totalExpected,
-      "الفرق (فعلي - متوقع) (د.ت)": summary.total - summary.totalExpected,
-      "عدد الاشتراكات المسددة": summary.count,
-    }]
-    const monthRows = summary.months.map((mk) => ({
-      "الشهر": monthLabel(mk),
-      "الإيرادات الفعلية (د.ت)": summary.byMonth[mk].real,
-      "عدد الاشتراكات": summary.byMonth[mk].count,
-      "الإيرادات المتوقعة (د.ت)": summary.byMonth[mk].expected,
-      "عدد الطلاب النشطين": summary.byMonth[mk].expectedCount,
-    }))
-    const classRows2 = Object.entries(summary.byClass).map(([name, v]) => ({
-      "القسم": name,
-      "عدد الاشتراكات": v.count,
-      "المجموع (د.ت)": v.total,
-    }))
-    exportExcelMultiSheet("financial_report", [
-      { name: "نظرة عامة", rows: overviewRows },
-      { name: "حسب الشهر", rows: monthRows },
-      { name: "حسب القسم", rows: classRows2 },
-      { name: "التفاصيل", rows: summary.detailRows },
-    ])
-  }
-
-  const handleFinancialPrint = async () => {
-    const summary = finSummary || (await loadFinancialData())
-    if (!summary) return
-    if (summary.count === 0) {
-      setFinError("لا يوجد اشتراكات مدفوعة في هذه الفترة")
-      return
-    }
-    const overviewRows = [{
-      "الإيرادات الفعلية": `${summary.total} د.ت`,
-      "الإيرادات المتوقعة": `${summary.totalExpected} د.ت`,
-      "الفرق (فعلي - متوقع)": `${summary.total - summary.totalExpected} د.ت`,
-      "عدد الاشتراكات": summary.count,
-    }]
-    const monthRows = summary.months.map((mk) => ({
-      "الشهر": monthLabel(mk),
-      "فعلي (د.ت)": summary.byMonth[mk].real,
-      "عدد": summary.byMonth[mk].count,
-      "متوقع (د.ت)": summary.byMonth[mk].expected,
-      "طلاب نشطون": summary.byMonth[mk].expectedCount,
-    }))
-    const classRows2 = Object.entries(summary.byClass).map(([name, v]) => ({
-      "القسم": name,
-      "عدد الاشتراكات": v.count,
-      "المجموع (د.ت)": v.total,
-    }))
-    printMultiSection({
-      title: "التقرير المالي",
-      sections: [
-        { heading: `نظرة عامة: من ${monthLabel(finStart)} إلى ${monthLabel(finEnd)}`, rows: overviewRows },
-        { heading: "حسب الشهر", rows: monthRows },
-        { heading: "حسب القسم", rows: classRows2 },
-        { heading: "تفاصيل الدفعات", rows: summary.detailRows },
-      ],
-    })
-  }
-
   return (
     <div>
       <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">التقارير</h2>
@@ -566,7 +385,7 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
         <p className="font-medium text-sm text-gray-900 dark:text-gray-100">سجل التقدم القرآني</p>
         <select
           value={progClassId}
@@ -607,116 +426,6 @@ export default function Reports() {
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
           >
             {progLoading ? "..." : "PDF / طباعة"}
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">التقرير المالي</p>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">من شهر</label>
-            <input
-              type="month"
-              value={finStart}
-              onChange={(e) => { setFinStart(e.target.value); setFinSummary(null) }}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">إلى شهر</label>
-            <input
-              type="month"
-              value={finEnd}
-              onChange={(e) => { setFinEnd(e.target.value); setFinSummary(null) }}
-              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-        </div>
-
-        {finError && <p className="text-red-600 dark:text-red-400 text-xs">{finError}</p>}
-
-        <button
-          onClick={loadFinancialData}
-          disabled={finLoading}
-          className="w-full bg-gray-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
-        >
-          {finLoading ? "جارٍ التحميل..." : "عرض الملخص"}
-        </button>
-
-        {finSummary && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="text-center bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-                <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{finSummary.total} د.ت</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">الإيرادات الفعلية</p>
-              </div>
-              <div className="text-center bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-                <p className="text-lg font-bold text-gray-700 dark:text-gray-300">{finSummary.totalExpected} د.ت</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">الإيرادات المتوقعة</p>
-              </div>
-              <div className="text-center bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-                <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{finSummary.count}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">عدد الاشتراكات</p>
-              </div>
-              <div className="text-center bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-                <p className={`text-lg font-bold ${
-                  finSummary.total - finSummary.totalExpected >= 0
-                    ? "text-emerald-700 dark:text-emerald-400"
-                    : "text-red-600 dark:text-red-400"
-                }`}>
-                  {finSummary.total - finSummary.totalExpected} د.ت
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">الفرق (فعلي - متوقع)</p>
-              </div>
-            </div>
-
-            {finSummary.months.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">حسب الشهر</p>
-                <div className="space-y-1">
-                  {finSummary.months.map((mk) => (
-                    <div key={mk} className="flex items-center justify-between text-xs border-b border-gray-200 dark:border-gray-700 py-1.5 last:border-0">
-                      <span className="text-gray-900 dark:text-gray-100">{monthLabel(mk)}</span>
-                      <span className="text-gray-500 dark:text-gray-400">
-                        {finSummary.byMonth[mk].real} / {finSummary.byMonth[mk].expected} د.ت
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {Object.keys(finSummary.byClass).length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-2">حسب القسم</p>
-                <div className="space-y-1">
-                  {Object.entries(finSummary.byClass).map(([name, v]) => (
-                    <div key={name} className="flex items-center justify-between text-xs border-b border-gray-200 dark:border-gray-700 py-1 last:border-0">
-                      <span className="text-gray-900 dark:text-gray-100">{name}</span>
-                      <span className="text-gray-500 dark:text-gray-400">{v.count} اشتراك — {v.total} د.ت</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <button
-            onClick={handleFinancialExcel}
-            disabled={finLoading}
-            className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
-          >
-            Excel
-          </button>
-          <button
-            onClick={handleFinancialPrint}
-            disabled={finLoading}
-            className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
-          >
-            PDF / طباعة
           </button>
         </div>
       </div>
