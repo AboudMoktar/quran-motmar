@@ -5,6 +5,7 @@ import { Search, Eye, EyeOff, Pencil } from "lucide-react"
 import { db, secondaryAuth, LOGIN_DOMAIN } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
+import { logActivity } from "../utils/activityLog"
 
 const ONLINE_WINDOW_MS = 5 * 60 * 1000
 const ROLE_LABELS = { staff: "إداري", teacher: "معلم" }
@@ -64,6 +65,7 @@ export default function Teachers() {
           phone: form.phone.trim(),
           role: form.role,
         })
+        logActivity("تعديل عضو", form.name.trim())
         setSheetOpen(false)
       } catch {
         setError("حدث خطأ أثناء الحفظ")
@@ -94,6 +96,7 @@ export default function Teachers() {
       })
 
       await signOut(secondaryAuth)
+      logActivity("إضافة عضو", `${form.name.trim()} (${ROLE_LABELS[form.role]})`)
       setSheetOpen(false)
     } catch (err) {
       if (err.code === "auth/email-already-in-use") {
@@ -105,9 +108,10 @@ export default function Teachers() {
     setLoading(false)
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (m) => {
     if (confirm("هل تريد حذف هذا العضو من الفريق؟")) {
-      await deleteDoc(doc(db, "users", id))
+      await deleteDoc(doc(db, "users", m.id))
+      logActivity("حذف عضو", m.name)
     }
   }
 
@@ -152,7 +156,7 @@ export default function Teachers() {
                 <button onClick={() => openEdit(m)} className="text-emerald-700">
                   <Pencil size={16} />
                 </button>
-                <button onClick={() => handleDelete(m.id)} className="text-red-600 text-xs">
+                <button onClick={() => handleDelete(m)} className="text-red-600 text-xs">
                   حذف
                 </button>
               </div>
