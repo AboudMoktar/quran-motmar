@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { Users, FileBarChart, Wallet, BookMarked, MessageCircle, Settings as SettingsIcon, ChevronLeft } from "lucide-react"
+import { Users, FileBarChart, Wallet, BookMarked, MessageCircle, Settings as SettingsIcon, History, ChevronLeft } from "lucide-react"
 
 const ITEMS = [
   { to: "/teachers", label: "الفريق", icon: Users },
@@ -7,6 +7,7 @@ const ITEMS = [
   { to: "/reports", label: "التقارير", icon: FileBarChart },
   { to: "/payments", label: "الاشتراكات", icon: Wallet },
   { to: "/messages", label: "الرسائل", icon: MessageCircle },
+  { to: "/logs", label: "سجل النشاط", icon: History },
   { to: "/settings", label: "الإعدادات", icon: SettingsIcon },
 ]
 
