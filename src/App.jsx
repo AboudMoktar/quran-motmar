@@ -9,6 +9,7 @@ import Classes from "./pages/Classes"
 import Students from "./pages/Students"
 import Attendance from "./pages/Attendance"
 import Payments from "./pages/Payments"
+import Finance from "./pages/Finance"
 import Progress from "./pages/Progress"
 import Reports from "./pages/Reports"
 import Messages from "./pages/Messages"
@@ -46,6 +47,7 @@ function AppContent() {
         <Route path="/classes" element={<AdminRoute><Classes /></AdminRoute>} />
         <Route path="/students" element={<AdminRoute><Students /></AdminRoute>} />
         <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
+        <Route path="/finance" element={<AdminRoute><Finance /></AdminRoute>} />
         <Route path="/messages" element={<AdminRoute><Messages /></AdminRoute>} />
         <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
         <Route path="/logs" element={<AdminRoute><Logs /></AdminRoute>} />
