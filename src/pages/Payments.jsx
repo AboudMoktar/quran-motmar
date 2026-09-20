@@ -1,21 +1,22 @@
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, query, where, doc, setDoc, deleteDoc } from "firebase/firestore"
-import { Search } from "lucide-react"
+import { collection, onSnapshot, query, where, addDoc, deleteDoc, doc } from "firebase/firestore"
+import { Search, ChevronDown, ChevronUp, Trash2 } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 import { getMonthlyFee } from "./Settings"
+import { MONTHS, MONTH_LABELS, STATUS_LABELS, computeStudentMonth } from "../utils/finance"
+import { logActivity } from "../utils/activityLog"
+import BottomSheet from "../components/BottomSheet"
 
-const MONTHS = [
-  "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"
-]
-const MONTH_LABELS = {
-  "01": "جانفي", "02": "فيفري", "03": "مارس", "04": "أفريل",
-  "05": "ماي", "06": "جوان", "07": "جويلية", "08": "أوت",
-  "09": "سبتمبر", "10": "أكتوبر", "11": "نوفمبر", "12": "ديسمبر"
+const STATUS_STYLES = {
+  paid: "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300",
+  partial: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300",
+  unpaid: "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300",
+  exempt: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
 }
 
 export default function Payments() {
-  const { user, role } = useAuth()
+  const { user, role, isAdminLevel } = useAuth()
   const [classes, setClasses] = useState([])
   const [classId, setClassId] = useState("")
   const [students, setStudents] = useState([])
@@ -24,10 +25,19 @@ export default function Payments() {
   const now = new Date()
   const [year, setYear] = useState(String(now.getFullYear()))
   const [month, setMonth] = useState(MONTHS[now.getMonth()])
-  const [payments, setPayments] = useState({})
-  const [historyStudentId, setHistoryStudentId] = useState("")
-  const [history, setHistory] = useState([])
-  const [message, setMessage] = useState("")
+  const [payments, setPayments] = useState([])
+  const [exemptions, setExemptions] = useState([])
+  const [expandedId, setExpandedId] = useState("")
+
+  const [formOpen, setFormOpen] = useState(false)
+  const [formMode, setFormMode] = useState("payment")
+  const [formStudent, setFormStudent] = useState(null)
+  const [formAmount, setFormAmount] = useState("")
+  const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10))
+  const [formNote, setFormNote] = useState("")
+  const [formReason, setFormReason] = useState("")
+  const [formError, setFormError] = useState("")
+  const [saving, setSaving] = useState(false)
 
   const monthKey = `${year}-${month}`
 
@@ -46,10 +56,7 @@ export default function Payments() {
   }, [role, user])
 
   useEffect(() => {
-    if (!classId) {
-      setStudents([])
-      return
-    }
+    if (!classId) { setStudents([]); return }
     const q = query(collection(db, "students"), where("classId", "==", classId))
     const unsub = onSnapshot(q, (snap) => {
       setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => !s.deletedAt))
@@ -59,60 +66,89 @@ export default function Payments() {
 
   useEffect(() => {
     if (!classId) return
-    const q = query(
-      collection(db, "payments"),
-      where("classId", "==", classId),
-      where("month", "==", monthKey)
-    )
+    const q = query(collection(db, "payments"), where("classId", "==", classId), where("month", "==", monthKey))
     const unsub = onSnapshot(q, (snap) => {
-      const map = {}
-      snap.docs.forEach((d) => { map[d.data().studentId] = d.data() })
-      setPayments(map)
+      setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     })
     return unsub
   }, [classId, monthKey])
 
-  const togglePaid = async (student) => {
-    if (monthlyFee === null) return
-    const paymentId = `${student.id}_${monthKey}`
-    setMessage("")
-
-    if (payments[student.id]) {
-      const confirmed = confirm(`هل تريد إلغاء تسجيل دفع ${student.name} لشهر ${MONTH_LABELS[month]}؟`)
-      if (!confirmed) return
-      await deleteDoc(doc(db, "payments", paymentId))
-      setMessage(`تم إلغاء تسجيل الدفع لـ ${student.name}`)
-    } else {
-      const confirmed = confirm(
-        `تأكيد استلام اشتراك ${student.name} لشهر ${MONTH_LABELS[month]} ${year} بمبلغ ${monthlyFee} د.ت؟`
-      )
-      if (!confirmed) return
-      await setDoc(doc(db, "payments", paymentId), {
-        studentId: student.id,
-        classId,
-        month: monthKey,
-        amount: monthlyFee,
-        paidDate: new Date().toISOString().slice(0, 10),
-      })
-      setMessage(`تم تأكيد استلام اشتراك ${student.name} بنجاح ✅`)
-    }
-    setTimeout(() => setMessage(""), 4000)
-  }
-
   useEffect(() => {
-    if (!historyStudentId) {
-      setHistory([])
-      return
-    }
-    const q = query(collection(db, "payments"), where("studentId", "==", historyStudentId))
+    if (!classId) return
+    const q = query(collection(db, "exemptions"), where("classId", "==", classId), where("month", "==", monthKey))
     const unsub = onSnapshot(q, (snap) => {
-      const list = snap.docs
-        .map((d) => d.data())
-        .sort((a, b) => (a.month < b.month ? 1 : -1))
-      setHistory(list)
+      setExemptions(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     })
     return unsub
-  }, [historyStudentId])
+  }, [classId, monthKey])
+
+  const forStudent = (list, studentId) => list.filter((x) => x.studentId === studentId)
+
+  const openForm = (student, mode) => {
+    const stat = computeStudentMonth(forStudent(payments, student.id), forStudent(exemptions, student.id), monthlyFee || 0)
+    setFormStudent(student)
+    setFormMode(mode)
+    setFormAmount(String(stat.remaining || ""))
+    setFormDate(new Date().toISOString().slice(0, 10))
+    setFormNote("")
+    setFormReason("")
+    setFormError("")
+    setFormOpen(true)
+  }
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault()
+    setFormError("")
+    const amount = Number(formAmount)
+    if (!amount || amount <= 0) {
+      setFormError("يرجى إدخال مبلغ صحيح")
+      return
+    }
+    setSaving(true)
+    try {
+      if (formMode === "payment") {
+        await addDoc(collection(db, "payments"), {
+          studentId: formStudent.id,
+          classId,
+          month: monthKey,
+          amount,
+          paidDate: formDate,
+          note: formNote.trim(),
+          mode: "نقداً",
+          recordedBy: user.uid,
+        })
+        logActivity("تسجيل دفعة", `${formStudent.name} — ${amount} د.ت`)
+      } else {
+        if (!formReason.trim()) {
+          setFormError("يرجى إدخال سبب الإعفاء")
+          setSaving(false)
+          return
+        }
+        await addDoc(collection(db, "exemptions"), {
+          studentId: formStudent.id,
+          classId,
+          month: monthKey,
+          amount,
+          reason: formReason.trim(),
+          note: formNote.trim(),
+          date: formDate,
+          recordedBy: user.uid,
+        })
+        logActivity("تسجيل إعفاء", `${formStudent.name} — ${amount} د.ت`)
+      }
+      setFormOpen(false)
+    } catch {
+      setFormError("حدث خطأ أثناء الحفظ")
+    }
+    setSaving(false)
+  }
+
+  const handleDeleteEntry = async (col, entry) => {
+    if (confirm("هل تريد حذف هذا السجل؟ سيتم إعادة حساب الوضعية المالية.")) {
+      await deleteDoc(doc(db, col, entry.id))
+      logActivity(col === "payments" ? "حذف دفعة" : "حذف إعفاء", `${entry.amount} د.ت`)
+    }
+  }
 
   const filteredStudents = students.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase())
@@ -120,12 +156,12 @@ export default function Payments() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الاشتراكات الشهرية</h2>
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">اشتراكات التلاميذ</h2>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6 space-y-3">
         <select
           value={classId}
-          onChange={(e) => { setClassId(e.target.value); setHistoryStudentId(""); setMessage(""); setSearch("") }}
+          onChange={(e) => { setClassId(e.target.value); setExpandedId(""); setSearch("") }}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         >
           <option value="">اختر القسم</option>
@@ -156,16 +192,8 @@ export default function Payments() {
         </p>
       </div>
 
-      {message && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg p-3 mb-4 text-center">
-          {message}
-        </div>
-      )}
-
       {classId && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
-          <p className="text-sm font-medium mb-3 text-gray-900 dark:text-gray-100">قائمة الطلاب - {MONTH_LABELS[month]} {year}</p>
-
+        <>
           <div className="relative mb-3">
             <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -177,57 +205,143 @@ export default function Payments() {
           </div>
 
           <div className="space-y-2">
-            {filteredStudents.map((s) => (
-              <div key={s.id} className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
-                <span className="text-sm text-gray-900 dark:text-gray-100">{s.name}</span>
-                <button
-                  onClick={() => togglePaid(s)}
-                  className={`px-3 py-1 rounded-lg text-xs ${
-                    payments[s.id] ? "bg-emerald-700 text-white" : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                  }`}
-                >
-                  {payments[s.id] ? "مدفوع ✓" : "غير مدفوع"}
-                </button>
-              </div>
-            ))}
+            {filteredStudents.map((s) => {
+              const sPayments = forStudent(payments, s.id)
+              const sExemptions = forStudent(exemptions, s.id)
+              const stat = computeStudentMonth(sPayments, sExemptions, monthlyFee || 0)
+              const expanded = expandedId === s.id
+              const history = [
+                ...sPayments.map((p) => ({ ...p, kind: "payment", d: p.paidDate })),
+                ...sExemptions.map((ex) => ({ ...ex, kind: "exemption", d: ex.date })),
+              ].sort((a, b) => (a.d < b.d ? 1 : -1))
+
+              return (
+                <div key={s.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3">
+                  <button
+                    onClick={() => setExpandedId(expanded ? "" : s.id)}
+                    className="w-full flex items-center justify-between"
+                  >
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{s.name}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {stat.paid} / {stat.due} د.ت
+                        {stat.exempted > 0 && ` — معفى ${stat.exempted} د.ت`}
+                        {stat.remaining > 0 && ` — متبقي ${stat.remaining} د.ت`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded-lg ${STATUS_STYLES[stat.status]}`}>
+                        {STATUS_LABELS[stat.status]}
+                      </span>
+                      {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                    </div>
+                  </button>
+
+                  {expanded && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                      {history.length > 0 && (
+                        <div className="space-y-1">
+                          {history.map((h) => (
+                            <div key={`${h.kind}_${h.id}`} className="flex items-center justify-between text-xs border-b border-gray-100 dark:border-gray-700 py-1 last:border-0">
+                              <span className="text-gray-600 dark:text-gray-300">
+                                {h.kind === "payment" ? "دفعة" : "إعفاء"} {h.amount} د.ت — {h.d}
+                                {h.kind === "exemption" && h.reason ? ` (${h.reason})` : ""}
+                              </span>
+                              {isAdminLevel && (
+                                <button onClick={() => handleDeleteEntry(h.kind === "payment" ? "payments" : "exemptions", h)}>
+                                  <Trash2 size={14} className="text-red-500" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {stat.remaining > 0 ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openForm(s, "payment")}
+                            className="flex-1 bg-emerald-700 text-white rounded-lg py-1.5 text-xs"
+                          >
+                            تسجيل دفعة
+                          </button>
+                          {isAdminLevel && (
+                            <button
+                              onClick={() => openForm(s, "exemption")}
+                              className="flex-1 bg-blue-700 text-white rounded-lg py-1.5 text-xs"
+                            >
+                              تسجيل إعفاء
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 text-center">لا يوجد مبلغ متبقي لهذا الشهر</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
             {filteredStudents.length === 0 && (
-              <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-4">
+              <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-6">
                 {search ? "لا توجد نتائج" : "لا يوجد طلاب في هذا القسم"}
               </p>
             )}
           </div>
-        </div>
+        </>
       )}
 
-      {classId && students.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
-          <p className="text-sm font-medium mb-3 text-gray-900 dark:text-gray-100">سجل الاشتراكات لطالب</p>
-          <select
-            value={historyStudentId}
-            onChange={(e) => setHistoryStudentId(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm mb-3 dark:bg-gray-700 dark:text-white"
+      <BottomSheet
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={formStudent ? `${formMode === "payment" ? "تسجيل دفعة" : "تسجيل إعفاء"} — ${formStudent.name}` : ""}
+        footer={
+          <button
+            type="submit"
+            form="payment-form"
+            disabled={saving}
+            className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-60"
           >
-            <option value="">اختر الطالب</option>
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-
-          {historyStudentId && (
-            <div className="space-y-1">
-              {history.map((h, i) => (
-                <div key={i} className="flex items-center justify-between text-sm border-b border-gray-200 dark:border-gray-700 py-1 last:border-0">
-                  <span className="text-gray-900 dark:text-gray-100">{MONTH_LABELS[h.month.slice(5)]} {h.month.slice(0, 4)}</span>
-                  <span className="text-emerald-700 dark:text-emerald-400">{h.amount} د.ت - {h.paidDate}</span>
-                </div>
-              ))}
-              {history.length === 0 && (
-                <p className="text-gray-400 dark:text-gray-500 text-xs text-center py-3">لا يوجد سجل دفع بعد</p>
-              )}
-            </div>
+            {saving ? "جارٍ الحفظ..." : "حفظ"}
+          </button>
+        }
+      >
+        <form id="payment-form" onSubmit={handleFormSubmit} className="space-y-3">
+          <label className="block text-xs text-gray-500 dark:text-gray-400">المبلغ (د.ت)</label>
+          <input
+            type="number"
+            value={formAmount}
+            onChange={(e) => setFormAmount(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+          />
+          {formMode === "exemption" && (
+            <>
+              <label className="block text-xs text-gray-500 dark:text-gray-400">سبب الإعفاء</label>
+              <input
+                value={formReason}
+                onChange={(e) => setFormReason(e.target.value)}
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+              />
+            </>
           )}
-        </div>
-      )}
+          <label className="block text-xs text-gray-500 dark:text-gray-400">التاريخ</label>
+          <input
+            type="date"
+            value={formDate}
+            onChange={(e) => setFormDate(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+          />
+          <label className="block text-xs text-gray-500 dark:text-gray-400">ملاحظة (اختياري)</label>
+          <input
+            value={formNote}
+            onChange={(e) => setFormNote(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+          />
+          {formMode === "payment" && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">طريقة الدفع: نقداً</p>
+          )}
+          {formError && <p className="text-red-600 dark:text-red-400 text-xs">{formError}</p>}
+        </form>
+      </BottomSheet>
     </div>
   )
 }
