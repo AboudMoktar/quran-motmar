@@ -4,6 +4,7 @@ import { Search, Pencil, Phone } from "lucide-react"
 import { db } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
+import { logActivity } from "../utils/activityLog"
 
 function calculateAge(birthDate) {
   if (!birthDate) return null
@@ -116,8 +117,10 @@ export default function Students() {
     try {
       if (editingId) {
         await updateDoc(doc(db, "students", editingId), data)
+        logActivity("تعديل طالب", fullName)
       } else {
         await addDoc(collection(db, "students"), data)
+        logActivity("إضافة طالب", fullName)
       }
       setSheetOpen(false)
     } catch {
@@ -125,9 +128,10 @@ export default function Students() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (s) => {
     if (confirm("هل تريد حذف هذا الطالب؟")) {
-      await deleteDoc(doc(db, "students", id))
+      await deleteDoc(doc(db, "students", s.id))
+      logActivity("حذف طالب", s.name)
     }
   }
 
@@ -181,7 +185,7 @@ export default function Students() {
                       <button onClick={() => openEdit(s)} className="text-emerald-700">
                         <Pencil size={16} />
                       </button>
-                      <button onClick={() => handleDelete(s.id)} className="text-red-600 text-xs">
+                      <button onClick={() => handleDelete(s)} className="text-red-600 text-xs">
                         حذف
                       </button>
                     </div>
