@@ -28,7 +28,7 @@ export default function Attendance() {
       ? query(collection(db, "classes"), where("teacherId", "==", user.uid))
       : collection(db, "classes")
     const unsub = onSnapshot(q, (snap) => {
-      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !c.deletedAt))
     })
     return unsub
   }, [role, user])
@@ -40,7 +40,7 @@ export default function Attendance() {
     }
     const q = query(collection(db, "students"), where("classId", "==", classId))
     const unsub = onSnapshot(q, (snap) => {
-      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => !s.deletedAt))
     })
     return unsub
   }, [classId])
@@ -114,13 +114,13 @@ export default function Attendance() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">الحضور</h2>
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الحضور</h2>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-6 space-y-3">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6 space-y-3">
         <select
           value={classId}
           onChange={(e) => { setClassId(e.target.value); setHistoryStudentId("") }}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         >
           <option value="">اختر القسم</option>
           {classes.map((c) => (
@@ -129,7 +129,7 @@ export default function Attendance() {
         </select>
 
         {selectedClass && (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             أيام الحصص: {(selectedClass.days || []).map((d) => DAYS_LABELS[d]).join(" - ")} — {selectedClass.time}
           </p>
         )}
@@ -139,32 +139,32 @@ export default function Attendance() {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
         ) : (
-          <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600">
+          <div className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
             {date} (اليوم فقط)
           </div>
         )}
 
         {selectedClass && !isAdminLevel && !classScheduledToday && (
-          <p className="text-red-600 text-xs">
+          <p className="text-red-600 dark:text-red-400 text-xs">
             لا يوجد حصة لهذا القسم اليوم — التسجيل متاح فقط في أيام الحصص المحددة
           </p>
         )}
       </div>
 
       {classId && canMark && (
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <p className="text-sm font-medium mb-3">قائمة الطلاب</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
+          <p className="text-sm font-medium mb-3 text-gray-900 dark:text-gray-100">قائمة الطلاب</p>
           <div className="space-y-2">
             {students.map((s) => (
-              <div key={s.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                <span className="text-sm">{s.name}</span>
+              <div key={s.id} className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                <span className="text-sm text-gray-900 dark:text-gray-100">{s.name}</span>
                 <button
                   onClick={() => toggle(s.id)}
                   className={`px-3 py-1 rounded-lg text-xs ${
-                    records[s.id] ? "bg-emerald-700 text-white" : "bg-red-100 text-red-700"
+                    records[s.id] ? "bg-emerald-700 text-white" : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
                   }`}
                 >
                   {records[s.id] ? "حاضر" : "غائب"}
@@ -172,7 +172,7 @@ export default function Attendance() {
               </div>
             ))}
             {students.length === 0 && (
-              <p className="text-gray-400 text-sm text-center py-4">لا يوجد طلاب في هذا القسم</p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-4">لا يوجد طلاب في هذا القسم</p>
             )}
           </div>
 
@@ -185,17 +185,17 @@ export default function Attendance() {
               {saving ? "جارٍ الحفظ..." : "حفظ الحضور"}
             </button>
           )}
-          {message && <p className="text-xs text-center mt-2 text-gray-600">{message}</p>}
+          {message && <p className="text-xs text-center mt-2 text-gray-600 dark:text-gray-400">{message}</p>}
         </div>
       )}
 
       {classId && students.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <p className="text-sm font-medium mb-3">سجل الحضور لطالب</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+          <p className="text-sm font-medium mb-3 text-gray-900 dark:text-gray-100">سجل الحضور لطالب</p>
           <select
             value={historyStudentId}
             onChange={(e) => setHistoryStudentId(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm mb-3"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm mb-3 dark:bg-gray-700 dark:text-white"
           >
             <option value="">اختر الطالب</option>
             {students.map((s) => (
@@ -206,15 +206,15 @@ export default function Attendance() {
           {historyStudentId && (
             <div className="space-y-1">
               {history.map((h, i) => (
-                <div key={i} className="flex items-center justify-between text-sm border-b py-1 last:border-0">
-                  <span>{h.date}</span>
-                  <span className={h.present ? "text-emerald-700" : "text-red-600"}>
+                <div key={i} className="flex items-center justify-between text-sm border-b border-gray-200 dark:border-gray-700 py-1 last:border-0">
+                  <span className="text-gray-900 dark:text-gray-100">{h.date}</span>
+                  <span className={h.present ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
                     {h.present ? "حاضر" : "غائب"}
                   </span>
                 </div>
               ))}
               {history.length === 0 && (
-                <p className="text-gray-400 text-xs text-center py-3">لا يوجد سجل بعد</p>
+                <p className="text-gray-400 dark:text-gray-500 text-xs text-center py-3">لا يوجد سجل بعد</p>
               )}
             </div>
           )}
