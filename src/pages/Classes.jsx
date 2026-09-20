@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where } from "firebase/firestore"
+import { collection, onSnapshot, addDoc, updateDoc, doc, query, where } from "firebase/firestore"
 import { Search, Pencil } from "lucide-react"
 import { db } from "../firebase"
 import FAB from "../components/FAB"
@@ -29,7 +29,7 @@ export default function Classes() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "classes"), (snap) => {
-      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !c.deletedAt))
     })
     return unsub
   }, [])
@@ -37,7 +37,7 @@ export default function Classes() {
   useEffect(() => {
     const q = query(collection(db, "users"), where("role", "==", "teacher"))
     const unsub = onSnapshot(q, (snap) => {
-      setTeachers(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setTeachers(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.deletedAt))
     })
     return unsub
   }, [])
@@ -90,7 +90,7 @@ export default function Classes() {
         await updateDoc(doc(db, "classes", editingId), data)
         logActivity("تعديل قسم", data.name)
       } else {
-        await addDoc(collection(db, "classes"), data)
+        await addDoc(collection(db, "classes"), { ...data, deletedAt: null })
         logActivity("إضافة قسم", data.name)
       }
       setSheetOpen(false)
@@ -100,9 +100,9 @@ export default function Classes() {
   }
 
   const handleDelete = async (c) => {
-    if (confirm("هل تريد حذف هذا القسم؟")) {
-      await deleteDoc(doc(db, "classes", c.id))
-      logActivity("حذف قسم", c.name)
+    if (confirm("هل تريد نقل هذا القسم إلى المحذوفات؟ يمكن استعادته خلال 7 أيام.")) {
+      await updateDoc(doc(db, "classes", c.id), { deletedAt: Date.now() })
+      logActivity("نقل قسم إلى المحذوفات", c.name)
     }
   }
 
