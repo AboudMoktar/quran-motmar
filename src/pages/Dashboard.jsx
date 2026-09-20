@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react"
+import { Link } from "react-router-dom"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "../firebase"
-import { PAYMENT_ALERT_DAY, MONTHLY_FEE } from "../config"
+import { PAYMENT_ALERT_DAY } from "../config"
+import { getMonthlyFee } from "./Settings"
 
 const LOW_ATTENDANCE_THRESHOLD = 70
 const MONTH_LABELS = {
@@ -16,6 +18,7 @@ export default function Dashboard() {
   const [teachers, setTeachers] = useState([])
   const [attendance, setAttendance] = useState([])
   const [payments, setPayments] = useState([])
+  const [monthlyFee, setMonthlyFee] = useState(null)
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
@@ -28,18 +31,20 @@ export default function Dashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const [classesSnap, studentsSnap, teachersSnap, attendanceSnap, paymentsSnap] = await Promise.all([
+      const [classesSnap, studentsSnap, teachersSnap, attendanceSnap, paymentsSnap, fee] = await Promise.all([
         getDocs(collection(db, "classes")),
         getDocs(collection(db, "students")),
         getDocs(query(collection(db, "users"), where("role", "==", "teacher"))),
         getDocs(collection(db, "attendance")),
         getDocs(query(collection(db, "payments"), where("month", "==", currentMonthKey))),
+        getMonthlyFee(),
       ])
       setClasses(classesSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
       setStudents(studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
       setTeachers(teachersSnap.docs.map((d) => ({ id: d.id, ...d.data() })))
       setAttendance(attendanceSnap.docs.map((d) => d.data()))
       setPayments(paymentsSnap.docs.map((d) => d.data()))
+      setMonthlyFee(fee)
       setLoading(false)
     }
     load()
@@ -124,9 +129,9 @@ export default function Dashboard() {
             تنبيه: اشتراكات غير مدفوعة لشهر {MONTH_LABELS[currentMonthKey.slice(5)]}
           </p>
           <p className="text-xs text-red-500 mb-3">
-            يرجى التواصل مع أولياء الأمور التالية أسماؤهم لتذكيرهم بالاشتراك ({MONTHLY_FEE} د.ت)
+            يرجى التواصل مع أولياء الأمور التالية أسماؤهم لتذكيرهم بالاشتراك ({monthlyFee} د.ت)
           </p>
-          <div className="space-y-2">
+          <div className="space-y-2 mb-3">
             {unpaidStudents.map((s) => (
               <div key={s.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2">
                 <div>
@@ -139,6 +144,12 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+          <Link
+            to="/messages"
+            className="block w-full text-center bg-red-600 text-white rounded-lg py-2 text-sm font-medium"
+          >
+            إرسال رسالة تذكير جماعية
+          </Link>
         </div>
       )}
 
