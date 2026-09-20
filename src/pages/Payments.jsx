@@ -40,7 +40,7 @@ export default function Payments() {
       ? query(collection(db, "classes"), where("teacherId", "==", user.uid))
       : collection(db, "classes")
     const unsub = onSnapshot(q, (snap) => {
-      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !c.deletedAt))
     })
     return unsub
   }, [role, user])
@@ -52,7 +52,7 @@ export default function Payments() {
     }
     const q = query(collection(db, "students"), where("classId", "==", classId))
     const unsub = onSnapshot(q, (snap) => {
-      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => !s.deletedAt))
     })
     return unsub
   }, [classId])
@@ -120,13 +120,13 @@ export default function Payments() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">الاشتراكات الشهرية</h2>
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الاشتراكات الشهرية</h2>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-6 space-y-3">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6 space-y-3">
         <select
           value={classId}
           onChange={(e) => { setClassId(e.target.value); setHistoryStudentId(""); setMessage(""); setSearch("") }}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         >
           <option value="">اختر القسم</option>
           {classes.map((c) => (
@@ -138,7 +138,7 @@ export default function Payments() {
           <select
             value={month}
             onChange={(e) => setMonth(e.target.value)}
-            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           >
             {MONTHS.map((m) => (
               <option key={m} value={m}>{MONTH_LABELS[m]}</option>
@@ -148,23 +148,23 @@ export default function Payments() {
             type="number"
             value={year}
             onChange={(e) => setYear(e.target.value)}
-            className="w-24 border rounded-lg px-3 py-2 text-sm"
+            className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           قيمة الاشتراك الشهري: {monthlyFee === null ? "..." : `${monthlyFee} د.ت`}
         </p>
       </div>
 
       {message && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-lg p-3 mb-4 text-center">
+        <div className="bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-sm rounded-lg p-3 mb-4 text-center">
           {message}
         </div>
       )}
 
       {classId && (
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-          <p className="text-sm font-medium mb-3">قائمة الطلاب - {MONTH_LABELS[month]} {year}</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
+          <p className="text-sm font-medium mb-3 text-gray-900 dark:text-gray-100">قائمة الطلاب - {MONTH_LABELS[month]} {year}</p>
 
           <div className="relative mb-3">
             <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -172,18 +172,18 @@ export default function Payments() {
               placeholder="بحث عن طالب..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full border rounded-lg pr-9 pl-3 py-2 text-sm"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg pr-9 pl-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
             />
           </div>
 
           <div className="space-y-2">
             {filteredStudents.map((s) => (
-              <div key={s.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                <span className="text-sm">{s.name}</span>
+              <div key={s.id} className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2 last:border-0">
+                <span className="text-sm text-gray-900 dark:text-gray-100">{s.name}</span>
                 <button
                   onClick={() => togglePaid(s)}
                   className={`px-3 py-1 rounded-lg text-xs ${
-                    payments[s.id] ? "bg-emerald-700 text-white" : "bg-red-100 text-red-700"
+                    payments[s.id] ? "bg-emerald-700 text-white" : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
                   }`}
                 >
                   {payments[s.id] ? "مدفوع ✓" : "غير مدفوع"}
@@ -191,7 +191,7 @@ export default function Payments() {
               </div>
             ))}
             {filteredStudents.length === 0 && (
-              <p className="text-gray-400 text-sm text-center py-4">
+              <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-4">
                 {search ? "لا توجد نتائج" : "لا يوجد طلاب في هذا القسم"}
               </p>
             )}
@@ -200,12 +200,12 @@ export default function Payments() {
       )}
 
       {classId && students.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <p className="text-sm font-medium mb-3">سجل الاشتراكات لطالب</p>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+          <p className="text-sm font-medium mb-3 text-gray-900 dark:text-gray-100">سجل الاشتراكات لطالب</p>
           <select
             value={historyStudentId}
             onChange={(e) => setHistoryStudentId(e.target.value)}
-            className="w-full border rounded-lg px-3 py-2 text-sm mb-3"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm mb-3 dark:bg-gray-700 dark:text-white"
           >
             <option value="">اختر الطالب</option>
             {students.map((s) => (
@@ -216,13 +216,13 @@ export default function Payments() {
           {historyStudentId && (
             <div className="space-y-1">
               {history.map((h, i) => (
-                <div key={i} className="flex items-center justify-between text-sm border-b py-1 last:border-0">
-                  <span>{MONTH_LABELS[h.month.slice(5)]} {h.month.slice(0, 4)}</span>
-                  <span className="text-emerald-700">{h.amount} د.ت - {h.paidDate}</span>
+                <div key={i} className="flex items-center justify-between text-sm border-b border-gray-200 dark:border-gray-700 py-1 last:border-0">
+                  <span className="text-gray-900 dark:text-gray-100">{MONTH_LABELS[h.month.slice(5)]} {h.month.slice(0, 4)}</span>
+                  <span className="text-emerald-700 dark:text-emerald-400">{h.amount} د.ت - {h.paidDate}</span>
                 </div>
               ))}
               {history.length === 0 && (
-                <p className="text-gray-400 text-xs text-center py-3">لا يوجد سجل دفع بعد</p>
+                <p className="text-gray-400 dark:text-gray-500 text-xs text-center py-3">لا يوجد سجل دفع بعد</p>
               )}
             </div>
           )}
