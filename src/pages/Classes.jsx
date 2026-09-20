@@ -4,6 +4,7 @@ import { Search, Pencil } from "lucide-react"
 import { db } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
+import { logActivity } from "../utils/activityLog"
 
 const DAYS = [
   { key: "sun", label: "الأحد" },
@@ -87,8 +88,10 @@ export default function Classes() {
     try {
       if (editingId) {
         await updateDoc(doc(db, "classes", editingId), data)
+        logActivity("تعديل قسم", data.name)
       } else {
         await addDoc(collection(db, "classes"), data)
+        logActivity("إضافة قسم", data.name)
       }
       setSheetOpen(false)
     } catch {
@@ -96,9 +99,10 @@ export default function Classes() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (c) => {
     if (confirm("هل تريد حذف هذا القسم؟")) {
-      await deleteDoc(doc(db, "classes", id))
+      await deleteDoc(doc(db, "classes", c.id))
+      logActivity("حذف قسم", c.name)
     }
   }
 
@@ -135,7 +139,7 @@ export default function Classes() {
               <button onClick={() => openEdit(c)} className="text-emerald-700">
                 <Pencil size={16} />
               </button>
-              <button onClick={() => handleDelete(c.id)} className="text-red-600 text-xs">
+              <button onClick={() => handleDelete(c)} className="text-red-600 text-xs">
                 حذف
               </button>
             </div>
