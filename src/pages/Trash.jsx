@@ -44,8 +44,8 @@ export default function Trash() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">المحذوفات</h2>
-      <p className="text-xs text-gray-500 mb-4">
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">المحذوفات</h2>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
         العناصر المحذوفة تُحفظ هنا مؤقتًا ويمكن استعادتها في أي وقت.
       </p>
       <div className="space-y-2">
@@ -54,15 +54,15 @@ export default function Trash() {
             ? Math.max(0, Math.ceil((item.deletedAt + SEVEN_DAYS_MS - Date.now()) / (24 * 60 * 60 * 1000)))
             : 0
           return (
-            <div key={`${item.col}_${item.id}`} className="bg-white rounded-xl shadow-sm p-3">
+            <div key={`${item.col}_${item.id}`} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <p className="text-sm font-medium">{item.name || item.username}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.name || item.username}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
                     {TYPE_LABELS[item.col]} — حُذف في {formatDate(item.deletedAt)}
                   </p>
                 </div>
-                <span className="text-xs text-amber-600">{daysLeft} يوم متبقي</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">{daysLeft} يوم متبقي</span>
               </div>
               <div className="flex gap-2">
                 <button
@@ -82,7 +82,7 @@ export default function Trash() {
           )
         })}
         {sorted.length === 0 && (
-          <p className="text-gray-400 text-sm text-center py-6">المحذوفات فارغة</p>
+          <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-6">المحذوفات فارغة</p>
         )}
       </div>
     </div>
