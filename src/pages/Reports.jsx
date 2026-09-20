@@ -27,13 +27,13 @@ export default function Reports() {
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
-      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !c.deletedAt))
     )
   }, [])
 
   useEffect(() => {
     getDocs(collection(db, "students")).then((snap) =>
-      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => !s.deletedAt))
     )
   }, [])
 
@@ -274,10 +274,10 @@ export default function Reports() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">التقارير</h2>
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">التقارير</h2>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">قائمة الأقسام</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">قائمة الأقسام</p>
         <div className="flex gap-2">
           <button
             onClick={() => exportExcel("classes", classRows())}
@@ -294,8 +294,8 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">قائمة الطلاب (كل الطلاب)</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">قائمة الطلاب (كل الطلاب)</p>
         <div className="flex gap-2">
           <button
             onClick={() => exportExcel("students", studentRows())}
@@ -312,12 +312,12 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">قوائم الطلاب حسب الأقسام</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">قوائم الطلاب حسب الأقسام</p>
         <select
           value={byClassSelection}
           onChange={(e) => setByClassSelection(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         >
           <option value="all">جميع الأقسام</option>
           {classes.map((c) => (
@@ -340,12 +340,12 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">سجل الحضور</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">سجل الحضور</p>
         <select
           value={attClassId}
           onChange={(e) => setAttClassId(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         >
           <option value="">اختر القسم</option>
           {classes.map((c) => (
@@ -357,16 +357,16 @@ export default function Reports() {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
         </div>
-        {error && <p className="text-red-600 text-xs">{error}</p>}
+        {error && <p className="text-red-600 dark:text-red-400 text-xs">{error}</p>}
         <div className="flex gap-2">
           <button
             onClick={handleAttendanceExcel}
@@ -385,12 +385,12 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">سجل التقدم القرآني</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">سجل التقدم القرآني</p>
         <select
           value={progClassId}
           onChange={(e) => setProgClassId(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         >
           <option value="">اختر القسم</option>
           {classes.map((c) => (
@@ -402,16 +402,16 @@ export default function Reports() {
             type="date"
             value={progStart}
             onChange={(e) => setProgStart(e.target.value)}
-            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
           <input
             type="date"
             value={progEnd}
             onChange={(e) => setProgEnd(e.target.value)}
-            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
         </div>
-        {progError && <p className="text-red-600 text-xs">{progError}</p>}
+        {progError && <p className="text-red-600 dark:text-red-400 text-xs">{progError}</p>}
         <div className="flex gap-2">
           <button
             onClick={handleProgressExcel}
