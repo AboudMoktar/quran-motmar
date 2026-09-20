@@ -122,7 +122,7 @@ export default function Teachers() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">الفريق</h2>
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الفريق</h2>
 
       <div className="relative mb-4">
         <Search size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -130,34 +130,34 @@ export default function Teachers() {
           placeholder="بحث..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full border rounded-lg pr-10 pl-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg pr-10 pl-3 py-2 text-sm dark:bg-gray-800 dark:text-white"
         />
       </div>
 
       <div className="space-y-2">
         {filteredMembers.map((m) => (
-          <div key={m.id} className="bg-white rounded-xl shadow-sm p-3">
+          <div key={m.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium text-sm">{m.name}</p>
+                  <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{m.name}</p>
                   {isOnline(m.lastActive) && (
-                    <span className="flex items-center gap-1 text-[10px] text-emerald-700">
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       متصل الآن
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500">@{m.username} — {m.phone}</p>
-                <span className="inline-block text-[10px] px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400">@{m.username} — {m.phone}</p>
+                <span className="inline-block text-[10px] px-2 py-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 mt-1">
                   {ROLE_LABELS[m.role] || m.role}
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <button onClick={() => openEdit(m)} className="text-emerald-700">
+                <button onClick={() => openEdit(m)} className="text-emerald-700 dark:text-emerald-400">
                   <Pencil size={16} />
                 </button>
-                <button onClick={() => handleDelete(m)} className="text-red-600 text-xs">
+                <button onClick={() => handleDelete(m)} className="text-red-600 dark:text-red-400 text-xs">
                   حذف
                 </button>
               </div>
@@ -165,7 +165,7 @@ export default function Teachers() {
           </div>
         ))}
         {filteredMembers.length === 0 && (
-          <p className="text-gray-400 text-sm text-center py-6">
+          <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-6">
             {search ? "لا توجد نتائج" : "لا يوجد أعضاء بعد"}
           </p>
         )}
@@ -189,13 +189,13 @@ export default function Teachers() {
         }
       >
         <form id="member-form" onSubmit={handleSubmit} className="space-y-3">
-          <p className="text-xs text-gray-500">نوع الحساب</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">نوع الحساب</p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setForm({ ...form, role: "teacher" })}
               className={`flex-1 py-2 rounded-lg text-sm border ${
-                form.role === "teacher" ? "bg-emerald-700 text-white border-emerald-700" : "bg-white text-gray-600 border-gray-300"
+                form.role === "teacher" ? "bg-emerald-700 text-white border-emerald-700" : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600"
               }`}
             >
               معلم
@@ -204,7 +204,7 @@ export default function Teachers() {
               type="button"
               onClick={() => setForm({ ...form, role: "staff" })}
               className={`flex-1 py-2 rounded-lg text-sm border ${
-                form.role === "staff" ? "bg-emerald-700 text-white border-emerald-700" : "bg-white text-gray-600 border-gray-300"
+                form.role === "staff" ? "bg-emerald-700 text-white border-emerald-700" : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600"
               }`}
             >
               إداري (صلاحيات كاملة)
@@ -217,7 +217,7 @@ export default function Teachers() {
                 placeholder="اسم المستخدم (تسجيل الدخول)"
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
               />
               <div className="relative">
                 <input
@@ -225,7 +225,7 @@ export default function Teachers() {
                   placeholder="كلمة المرور"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full border rounded-lg px-3 py-2 pl-10 text-sm"
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 pl-10 text-sm dark:bg-gray-700 dark:text-white"
                 />
                 <button
                   type="button"
@@ -242,15 +242,15 @@ export default function Teachers() {
             placeholder="الاسم الكامل"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
           <input
             placeholder="رقم الهاتف"
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
-          {error && <p className="text-red-600 text-xs">{error}</p>}
+          {error && <p className="text-red-600 dark:text-red-400 text-xs">{error}</p>}
         </form>
       </BottomSheet>
     </div>
