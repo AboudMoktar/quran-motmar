@@ -315,14 +315,16 @@ export default function Reports() {
     setFinLoading(true)
     setFinError("")
     try {
-      const [snap, fee] = await Promise.all([
+      const [snap, allStudentsSnap, allClassesSnap, fee] = await Promise.all([
         getDocs(collection(db, "payments")),
+        getDocs(collection(db, "students")),
+        getDocs(collection(db, "classes")),
         getMonthlyFee(),
       ])
       const studentMap = {}
-      students.forEach((s) => { studentMap[s.id] = s })
+      allStudentsSnap.docs.forEach((d) => { studentMap[d.id] = d.data() })
       const classMap = {}
-      classes.forEach((c) => { classMap[c.id] = c.name })
+      allClassesSnap.docs.forEach((d) => { classMap[d.id] = d.data().name })
 
       const months = monthsInRange(finStart, finEnd)
 
@@ -362,8 +364,8 @@ export default function Reports() {
 
       const detailRows = payments
         .map((p) => ({
-          "الطالب": studentMap[p.studentId]?.name || p.studentId,
-          "القسم": classMap[p.classId] || "-",
+          "الطالب": studentMap[p.studentId]?.name || "طالب محذوف",
+          "القسم": classMap[p.classId] || "قسم محذوف",
           "الشهر": monthLabel(p.month),
           "المبلغ": p.amount,
           "تاريخ الدفع": p.paidDate,
