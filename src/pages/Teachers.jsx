@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, query, where } from "firebase/firestore"
+import { collection, onSnapshot, doc, setDoc, updateDoc, query, where } from "firebase/firestore"
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth"
 import { Search, Eye, EyeOff, Pencil } from "lucide-react"
 import { db, secondaryAuth, LOGIN_DOMAIN } from "../firebase"
@@ -29,7 +29,7 @@ export default function Teachers() {
   useEffect(() => {
     const q = query(collection(db, "users"), where("role", "in", ["teacher", "staff"]))
     const unsub = onSnapshot(q, (snap) => {
-      setMembers(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setMembers(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((m) => !m.deletedAt))
     })
     return unsub
   }, [])
@@ -93,6 +93,7 @@ export default function Teachers() {
         username: cleanUsername,
         name: form.name.trim(),
         phone: form.phone.trim(),
+        deletedAt: null,
       })
 
       await signOut(secondaryAuth)
@@ -109,9 +110,9 @@ export default function Teachers() {
   }
 
   const handleDelete = async (m) => {
-    if (confirm("هل تريد حذف هذا العضو من الفريق؟")) {
-      await deleteDoc(doc(db, "users", m.id))
-      logActivity("حذف عضو", m.name)
+    if (confirm("هل تريد نقل هذا العضو إلى المحذوفات؟ يمكن استعادته خلال 7 أيام.")) {
+      await updateDoc(doc(db, "users", m.id), { deletedAt: Date.now() })
+      logActivity("نقل عضو إلى المحذوفات", m.name)
     }
   }
 
