@@ -121,7 +121,7 @@ export default function Messages() {
       const snap = await getDocs(collection(db, "students"))
       const students = snap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((s) => s.active !== false && s.parentPhone && s.parentPhone.trim())
+        .filter((s) => !s.deletedAt && s.active !== false && s.parentPhone && s.parentPhone.trim())
       const recipients = students.map((s) => ({ name: s.name, phone: s.parentPhone.trim() }))
       setEnrolledRecipients(recipients)
       setLoadingEnrolled(false)
@@ -142,7 +142,7 @@ export default function Messages() {
       ])
       const students = studentsSnap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((s) => s.active !== false)
+        .filter((s) => !s.deletedAt && s.active !== false)
       const paidIds = new Set(paymentsSnap.docs.map((d) => d.data().studentId))
       const unpaid = students.filter((s) => !paidIds.has(s.id) && s.parentPhone && s.parentPhone.trim())
       const recipients = unpaid.map((s) => ({ name: s.name, phone: s.parentPhone.trim() }))
@@ -164,7 +164,7 @@ export default function Messages() {
       ])
       const students = studentsSnap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((s) => s.active !== false && s.parentPhone && s.parentPhone.trim())
+        .filter((s) => !s.deletedAt && s.active !== false && s.parentPhone && s.parentPhone.trim())
       const records = attendanceSnap.docs
         .map((d) => d.data())
         .filter((a) => a.date >= absenceFrom && a.date <= absenceTo)
@@ -233,21 +233,21 @@ export default function Messages() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">الرسائل</h2>
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الرسائل</h2>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">إعلام ببداية الدراسة</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">إعلام ببداية الدراسة</p>
         <input
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         />
         <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">نص الرسالة (قابل للتعديل)</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">نص الرسالة (قابل للتعديل)</p>
           <button
             onClick={() => { setStartText(defaultStartMessage()); setStartEdited(false) }}
-            className="text-xs text-emerald-700"
+            className="text-xs text-emerald-700 dark:text-emerald-400"
           >
             استعادة النص الافتراضي
           </button>
@@ -256,9 +256,9 @@ export default function Messages() {
           value={startText}
           onChange={(e) => { setStartText(e.target.value); setStartEdited(true) }}
           rows={6}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           المستلمون: جميع أولياء أمور الطلاب النشطين ({enrolledRecipients.length > 0 ? `${enrolledRecipients.length} رقم` : "سيتم تحميلهم عند الإرسال"})
         </p>
         <div className="flex gap-2">
@@ -278,19 +278,19 @@ export default function Messages() {
         </div>
         <button
           onClick={handleStartCopyNumbers}
-          className="w-full text-emerald-700 text-xs py-1"
+          className="w-full text-emerald-700 dark:text-emerald-400 text-xs py-1"
         >
           {numbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">تذكير بالاشتراك الشهري</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">تذكير بالاشتراك الشهري</p>
         <div className="flex gap-2">
           <select
             value={month}
             onChange={(e) => { setMonth(e.target.value); setUnpaidRecipients([]) }}
-            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           >
             {MONTHS.map((m) => (
               <option key={m} value={m}>{MONTH_LABELS[m]}</option>
@@ -300,10 +300,10 @@ export default function Messages() {
             type="number"
             value={year}
             onChange={(e) => { setYear(e.target.value); setUnpaidRecipients([]) }}
-            className="w-24 border rounded-lg px-3 py-2 text-sm"
+            className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
         </div>
-        <label className="flex items-center gap-2 text-xs text-gray-600">
+        <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
           <input
             type="checkbox"
             checked={includeNames}
@@ -312,10 +312,10 @@ export default function Messages() {
           تضمين أسماء الطلاب في نص الرسالة
         </label>
         <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">نص الرسالة (قابل للتعديل)</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">نص الرسالة (قابل للتعديل)</p>
           <button
             onClick={() => { setPaymentText(defaultPaymentMessage(unpaidRecipients)); setPaymentEdited(false) }}
-            className="text-xs text-emerald-700"
+            className="text-xs text-emerald-700 dark:text-emerald-400"
           >
             استعادة النص الافتراضي
           </button>
@@ -324,9 +324,9 @@ export default function Messages() {
           value={paymentText}
           onChange={(e) => { setPaymentText(e.target.value); setPaymentEdited(true) }}
           rows={6}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           المستلمون: أولياء أمور الطلاب غير المسددين ({unpaidRecipients.length > 0 ? `${unpaidRecipients.length} رقم` : "سيتم تحميلهم عند الإرسال"})
         </p>
         <div className="flex gap-2">
@@ -346,15 +346,15 @@ export default function Messages() {
         </div>
         <button
           onClick={handlePaymentCopyNumbers}
-          className="w-full text-emerald-700 text-xs py-1"
+          className="w-full text-emerald-700 dark:text-emerald-400 text-xs py-1"
         >
           {paymentNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">تذكير بالغياب المتكرر</p>
-        <p className="text-xs text-gray-500">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">تذكير بالغياب المتكرر</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           يشمل الطلاب بنسبة حضور أقل من {LOW_ATTENDANCE_THRESHOLD}% خلال الفترة المحددة
         </p>
         <div className="flex gap-2">
@@ -362,16 +362,16 @@ export default function Messages() {
             type="date"
             value={absenceFrom}
             onChange={(e) => { setAbsenceFrom(e.target.value); setAbsenceRecipients([]) }}
-            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
           <input
             type="date"
             value={absenceTo}
             onChange={(e) => { setAbsenceTo(e.target.value); setAbsenceRecipients([]) }}
-            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
         </div>
-        <label className="flex items-center gap-2 text-xs text-gray-600">
+        <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
           <input
             type="checkbox"
             checked={absenceIncludeNames}
@@ -379,12 +379,12 @@ export default function Messages() {
           />
           تضمين أسماء الطلاب ونسبة حضورهم في نص الرسالة
         </label>
-        {loadingAbsence && <p className="text-xs text-gray-400">جارٍ التحميل...</p>}
+        {loadingAbsence && <p className="text-xs text-gray-400 dark:text-gray-500">جارٍ التحميل...</p>}
         <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">نص الرسالة (قابل للتعديل)</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">نص الرسالة (قابل للتعديل)</p>
           <button
             onClick={() => { setAbsenceText(defaultAbsenceMessage(absenceRecipients)); setAbsenceEdited(false) }}
-            className="text-xs text-emerald-700"
+            className="text-xs text-emerald-700 dark:text-emerald-400"
           >
             استعادة النص الافتراضي
           </button>
@@ -393,9 +393,9 @@ export default function Messages() {
           value={absenceText}
           onChange={(e) => { setAbsenceText(e.target.value); setAbsenceEdited(true) }}
           rows={6}
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           المستلمون: {absenceRecipients.length > 0 ? `${absenceRecipients.length} رقم` : "سيتم تحميلهم عند الإرسال"}
         </p>
         <div className="flex gap-2">
@@ -415,7 +415,7 @@ export default function Messages() {
         </div>
         <button
           onClick={handleAbsenceCopyNumbers}
-          className="w-full text-emerald-700 text-xs py-1"
+          className="w-full text-emerald-700 dark:text-emerald-400 text-xs py-1"
         >
           {absenceNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
         </button>
