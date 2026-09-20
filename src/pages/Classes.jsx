@@ -115,7 +115,7 @@ export default function Classes() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">الأقسام</h2>
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الأقسام</h2>
 
       <div className="relative mb-4">
         <Search size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -123,30 +123,30 @@ export default function Classes() {
           placeholder="بحث عن قسم..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full border rounded-lg pr-10 pl-3 py-2 text-sm"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg pr-10 pl-3 py-2 text-sm dark:bg-gray-800 dark:text-white"
         />
       </div>
 
       <div className="space-y-2">
         {filteredClasses.map((c) => (
-          <div key={c.id} className="bg-white rounded-xl shadow-sm p-3 flex items-center justify-between">
+          <div key={c.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3 flex items-center justify-between">
             <div>
-              <p className="font-medium text-sm">{c.name}</p>
-              <p className="text-xs text-gray-500">{c.level} - {c.teacherName}</p>
-              <p className="text-xs text-gray-400">{dayLabels(c.days || [])} - {c.time}</p>
+              <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{c.name}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{c.level} - {c.teacherName}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">{dayLabels(c.days || [])} - {c.time}</p>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => openEdit(c)} className="text-emerald-700">
+              <button onClick={() => openEdit(c)} className="text-emerald-700 dark:text-emerald-400">
                 <Pencil size={16} />
               </button>
-              <button onClick={() => handleDelete(c)} className="text-red-600 text-xs">
+              <button onClick={() => handleDelete(c)} className="text-red-600 dark:text-red-400 text-xs">
                 حذف
               </button>
             </div>
           </div>
         ))}
         {filteredClasses.length === 0 && (
-          <p className="text-gray-400 text-sm text-center py-6">
+          <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-6">
             {search ? "لا توجد نتائج" : "لا توجد أقسام بعد"}
           </p>
         )}
@@ -169,18 +169,18 @@ export default function Classes() {
             placeholder="اسم القسم"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
           <input
             placeholder="المستوى"
             value={form.level}
             onChange={(e) => setForm({ ...form, level: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
           <select
             value={form.teacherId}
             onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           >
             <option value="">اختر المعلم</option>
             {teachers.map((t) => (
@@ -188,7 +188,7 @@ export default function Classes() {
             ))}
           </select>
 
-          <p className="text-sm text-gray-600">ايام الحصص</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">ايام الحصص</p>
           <div className="flex flex-wrap gap-2">
             {DAYS.map((d) => (
               <button
@@ -198,7 +198,7 @@ export default function Classes() {
                 className={`px-3 py-1 rounded-full text-xs border ${
                   form.days.includes(d.key)
                     ? "bg-emerald-700 text-white border-emerald-700"
-                    : "bg-white text-gray-600 border-gray-300"
+                    : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600"
                 }`}
               >
                 {d.label}
@@ -206,15 +206,15 @@ export default function Classes() {
             ))}
           </div>
 
-          <label className="block text-sm text-gray-600">وقت الحصة</label>
+          <label className="block text-sm text-gray-600 dark:text-gray-300">وقت الحصة</label>
           <input
             type="time"
             value={form.time}
             onChange={(e) => setForm({ ...form, time: e.target.value })}
-            className="w-full border rounded-lg px-3 py-2 text-sm"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
 
-          {error && <p className="text-red-600 text-xs">{error}</p>}
+          {error && <p className="text-red-600 dark:text-red-400 text-xs">{error}</p>}
         </form>
       </BottomSheet>
     </div>
