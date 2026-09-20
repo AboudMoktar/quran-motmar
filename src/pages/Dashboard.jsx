@@ -291,7 +291,7 @@ export default function Dashboard() {
         <p className="font-medium text-sm mb-3">
           تنبيه: طلاب بنسبة حضور منخفضة (أقل من {LOW_ATTENDANCE_THRESHOLD}%)
         </p>
-        <div className="space-y-2">
+        <div className="space-y-2 mb-3">
           {lowAttendanceStudents.map((s) => (
             <div key={s.id} className="flex items-center justify-between border-b pb-2 last:border-0">
               <div>
@@ -305,6 +305,14 @@ export default function Dashboard() {
             <p className="text-gray-400 text-xs text-center py-2">لا يوجد طلاب بنسبة حضور منخفضة</p>
           )}
         </div>
+        {lowAttendanceStudents.length > 0 && (
+          <Link
+            to="/messages"
+            className="block w-full text-center bg-amber-600 text-white rounded-lg py-2 text-sm font-medium"
+          >
+            إرسال رسالة تذكير بالغياب
+          </Link>
+        )}
       </div>
     </div>
   )
