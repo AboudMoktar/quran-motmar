@@ -12,6 +12,7 @@ import Progress from "./pages/Progress"
 import Reports from "./pages/Reports"
 import Messages from "./pages/Messages"
 import Settings from "./pages/Settings"
+import Logs from "./pages/Logs"
 import More from "./pages/More"
 
 function AdminRoute({ children }) {
@@ -45,6 +46,7 @@ function AppContent() {
         <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
         <Route path="/messages" element={<AdminRoute><Messages /></AdminRoute>} />
         <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
+        <Route path="/logs" element={<AdminRoute><Logs /></AdminRoute>} />
         <Route path="/more" element={<AdminRoute><More /></AdminRoute>} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/payments" element={<Payments />} />
