@@ -393,7 +393,7 @@ export default function Reports() {
     const overviewRows = [{
       "إجمالي الإيرادات الفعلية (د.ت)": summary.total,
       "إجمالي الإيرادات المتوقعة (د.ت)": summary.totalExpected,
-      "الفارق (د.ت)": summary.totalExpected - summary.total,
+      "الفرق (فعلي - متوقع) (د.ت)": summary.total - summary.totalExpected,
       "عدد الاشتراكات المسددة": summary.count,
     }]
     const monthRows = summary.months.map((mk) => ({
@@ -426,7 +426,7 @@ export default function Reports() {
     const overviewRows = [{
       "الإيرادات الفعلية": `${summary.total} د.ت`,
       "الإيرادات المتوقعة": `${summary.totalExpected} د.ت`,
-      "الفارق": `${summary.totalExpected - summary.total} د.ت`,
+      "الفرق (فعلي - متوقع)": `${summary.total - summary.totalExpected} د.ت`,
       "عدد الاشتراكات": summary.count,
     }]
     const monthRows = summary.months.map((mk) => ({
@@ -659,10 +659,14 @@ export default function Reports() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">عدد الاشتراكات</p>
               </div>
               <div className="text-center bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-                <p className="text-lg font-bold text-red-600 dark:text-red-400">
-                  {finSummary.totalExpected - finSummary.total} د.ت
+                <p className={`text-lg font-bold ${
+                  finSummary.total - finSummary.totalExpected >= 0
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-red-600 dark:text-red-400"
+                }`}>
+                  {finSummary.total - finSummary.totalExpected} د.ت
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">المتبقي غير المحصل</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">الفرق (فعلي - متوقع)</p>
               </div>
             </div>
 
