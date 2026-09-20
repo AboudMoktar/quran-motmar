@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom"
-import { Users, FileBarChart, Wallet, BookMarked, MessageCircle, Settings as SettingsIcon, History, Trash2, ChevronLeft } from "lucide-react"
+import { Users, FileBarChart, Wallet, TrendingUp, BookMarked, MessageCircle, Settings as SettingsIcon, History, Trash2, ChevronLeft } from "lucide-react"
 
 const ITEMS = [
   { to: "/teachers", label: "الفريق", icon: Users },
   { to: "/progress", label: "التقدم القرآني", icon: BookMarked },
   { to: "/reports", label: "التقارير", icon: FileBarChart },
   { to: "/payments", label: "الاشتراكات", icon: Wallet },
+  { to: "/finance", label: "الوضعية المالية", icon: TrendingUp },
   { to: "/messages", label: "الرسائل", icon: MessageCircle },
   { to: "/logs", label: "سجل النشاط", icon: History },
   { to: "/trash", label: "المحذوفات", icon: Trash2 },
