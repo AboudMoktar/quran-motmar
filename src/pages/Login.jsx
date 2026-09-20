@@ -26,35 +26,35 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-900">
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-2xl shadow-md p-6 w-full max-w-sm"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 w-full max-w-sm"
       >
-        <h1 className="text-xl font-bold text-emerald-700 text-center mb-1">
+        <h1 className="text-xl font-bold text-emerald-700 dark:text-emerald-400 text-center mb-1">
           {ASSOCIATION_NAME}
         </h1>
-        <p className="text-gray-500 text-center text-sm mb-6">
+        <p className="text-gray-500 dark:text-gray-400 text-center text-sm mb-6">
           {BRANCH_LABEL}
         </p>
 
-        <label className="block text-sm text-gray-600 mb-1">اسم المستخدم</label>
+        <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">اسم المستخدم</label>
         <input
           type="text"
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
           required
-          className="w-full border rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
         />
 
-        <label className="block text-sm text-gray-600 mb-1">كلمة المرور</label>
+        <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">كلمة المرور</label>
         <div className="relative mb-4">
           <input
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full border rounded-lg px-3 py-2 pl-10 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 pl-10 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:text-white"
           />
           <button
             type="button"
@@ -65,7 +65,7 @@ export default function Login() {
           </button>
         </div>
 
-        {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+        {error && <p className="text-red-600 dark:text-red-400 text-sm mb-4">{error}</p>}
 
         <button
           type="submit"
