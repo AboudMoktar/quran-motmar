@@ -10,6 +10,7 @@ const MONTH_LABELS = {
   "05": "ماي", "06": "جوان", "07": "جويلية", "08": "أوت",
   "09": "سبتمبر", "10": "أكتوبر", "11": "نوفمبر", "12": "ديسمبر"
 }
+const LOW_ATTENDANCE_THRESHOLD = 70
 
 function openSms(numbers, text) {
   const url = `sms:${numbers.join(",")}?body=${encodeURIComponent(text)}`
@@ -18,6 +19,12 @@ function openSms(numbers, text) {
 
 function copyText(text, onDone) {
   navigator.clipboard.writeText(text).then(() => onDone())
+}
+
+function daysAgo(n) {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return d.toISOString().slice(0, 10)
 }
 
 export default function Messages() {
@@ -40,6 +47,16 @@ export default function Messages() {
   const [paymentNumbersCopied, setPaymentNumbersCopied] = useState(false)
   const [loadingUnpaid, setLoadingUnpaid] = useState(false)
   const [unpaidRecipients, setUnpaidRecipients] = useState([])
+
+  const [absenceFrom, setAbsenceFrom] = useState(daysAgo(30))
+  const [absenceTo, setAbsenceTo] = useState(now.toISOString().slice(0, 10))
+  const [absenceText, setAbsenceText] = useState("")
+  const [absenceEdited, setAbsenceEdited] = useState(false)
+  const [absenceCopied, setAbsenceCopied] = useState(false)
+  const [absenceNumbersCopied, setAbsenceNumbersCopied] = useState(false)
+  const [loadingAbsence, setLoadingAbsence] = useState(false)
+  const [absenceRecipients, setAbsenceRecipients] = useState([])
+  const [absenceIncludeNames, setAbsenceIncludeNames] = useState(false)
 
   useEffect(() => {
     getMonthlyFee().then(setMonthlyFee)
@@ -78,6 +95,24 @@ export default function Messages() {
   useEffect(() => {
     if (!paymentEdited) setPaymentText(defaultPaymentMessage(unpaidRecipients))
   }, [month, year, includeNames, unpaidRecipients, monthlyFee])
+
+  const defaultAbsenceMessage = (recipients) => {
+    const lines = [
+      `السلام عليكم أولياء الأمور الكرام،`,
+      ``,
+      `نلاحظ غيابات متكررة لبعض الطلاب خلال الفترة الأخيرة. نرجو منكم متابعة انتظام أبنائكم في الحصص.`,
+    ]
+    if (absenceIncludeNames && recipients.length > 0) {
+      lines.push(``, `الطلاب المعنيون:`)
+      recipients.forEach((r) => lines.push(`- ${r.name} (${r.rate}% حضور)`))
+    }
+    lines.push(``, `شكرًا لتعاونكم`)
+    return lines.join("\n")
+  }
+
+  useEffect(() => {
+    if (!absenceEdited) setAbsenceText(defaultAbsenceMessage(absenceRecipients))
+  }, [absenceIncludeNames, absenceRecipients])
 
   const loadEnrolled = async () => {
     if (enrolledRecipients.length > 0) return enrolledRecipients
@@ -120,6 +155,43 @@ export default function Messages() {
     }
   }
 
+  const loadLowAttendance = async () => {
+    setLoadingAbsence(true)
+    try {
+      const [studentsSnap, attendanceSnap] = await Promise.all([
+        getDocs(collection(db, "students")),
+        getDocs(collection(db, "attendance")),
+      ])
+      const students = studentsSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((s) => s.active !== false && s.parentPhone && s.parentPhone.trim())
+      const records = attendanceSnap.docs
+        .map((d) => d.data())
+        .filter((a) => a.date >= absenceFrom && a.date <= absenceTo)
+
+      const result = []
+      students.forEach((s) => {
+        const effectiveStart = s.enrollDate && s.enrollDate > absenceFrom ? s.enrollDate : absenceFrom
+        const marks = records
+          .filter((a) => a.date >= effectiveStart && a.records && s.id in a.records)
+          .map((a) => a.records[s.id])
+        if (marks.length === 0) return
+        const present = marks.filter(Boolean).length
+        const rate = Math.round((present / marks.length) * 100)
+        if (rate < LOW_ATTENDANCE_THRESHOLD) {
+          result.push({ name: s.name, phone: s.parentPhone.trim(), rate })
+        }
+      })
+      result.sort((a, b) => a.rate - b.rate)
+      setAbsenceRecipients(result)
+      setLoadingAbsence(false)
+      return result
+    } catch {
+      setLoadingAbsence(false)
+      return []
+    }
+  }
+
   const handleStartSms = async () => {
     const recipients = await loadEnrolled()
     openSms(recipients.map((r) => r.phone), startText)
@@ -143,6 +215,19 @@ export default function Messages() {
     copyText(recipients.map((r) => r.phone).join(", "), () => {
       setPaymentNumbersCopied(true)
       setTimeout(() => setPaymentNumbersCopied(false), 2500)
+    })
+  }
+
+  const handleAbsenceSms = async () => {
+    const recipients = absenceRecipients.length > 0 ? absenceRecipients : await loadLowAttendance()
+    openSms(recipients.map((r) => r.phone), absenceText)
+  }
+
+  const handleAbsenceCopyNumbers = async () => {
+    const recipients = absenceRecipients.length > 0 ? absenceRecipients : await loadLowAttendance()
+    copyText(recipients.map((r) => r.phone).join(", "), () => {
+      setAbsenceNumbersCopied(true)
+      setTimeout(() => setAbsenceNumbersCopied(false), 2500)
     })
   }
 
@@ -199,7 +284,7 @@ export default function Messages() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
         <p className="font-medium text-sm">تذكير بالاشتراك الشهري</p>
         <div className="flex gap-2">
           <select
@@ -264,6 +349,75 @@ export default function Messages() {
           className="w-full text-emerald-700 text-xs py-1"
         >
           {paymentNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm">تذكير بالغياب المتكرر</p>
+        <p className="text-xs text-gray-500">
+          يشمل الطلاب بنسبة حضور أقل من {LOW_ATTENDANCE_THRESHOLD}% خلال الفترة المحددة
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={absenceFrom}
+            onChange={(e) => { setAbsenceFrom(e.target.value); setAbsenceRecipients([]) }}
+            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          />
+          <input
+            type="date"
+            value={absenceTo}
+            onChange={(e) => { setAbsenceTo(e.target.value); setAbsenceRecipients([]) }}
+            className="flex-1 border rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <label className="flex items-center gap-2 text-xs text-gray-600">
+          <input
+            type="checkbox"
+            checked={absenceIncludeNames}
+            onChange={(e) => setAbsenceIncludeNames(e.target.checked)}
+          />
+          تضمين أسماء الطلاب ونسبة حضورهم في نص الرسالة
+        </label>
+        {loadingAbsence && <p className="text-xs text-gray-400">جارٍ التحميل...</p>}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">نص الرسالة (قابل للتعديل)</p>
+          <button
+            onClick={() => { setAbsenceText(defaultAbsenceMessage(absenceRecipients)); setAbsenceEdited(false) }}
+            className="text-xs text-emerald-700"
+          >
+            استعادة النص الافتراضي
+          </button>
+        </div>
+        <textarea
+          value={absenceText}
+          onChange={(e) => { setAbsenceText(e.target.value); setAbsenceEdited(true) }}
+          rows={6}
+          className="w-full border rounded-lg px-3 py-2 text-sm"
+        />
+        <p className="text-xs text-gray-500">
+          المستلمون: {absenceRecipients.length > 0 ? `${absenceRecipients.length} رقم` : "سيتم تحميلهم عند الإرسال"}
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={handleAbsenceSms}
+            disabled={loadingAbsence}
+            className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
+          >
+            {loadingAbsence ? "جارٍ التحميل..." : "فتح الرسائل"}
+          </button>
+          <button
+            onClick={() => copyText(absenceText, () => { setAbsenceCopied(true); setTimeout(() => setAbsenceCopied(false), 2500) })}
+            className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
+          >
+            {absenceCopied ? "تم النسخ ✓" : "نسخ النص"}
+          </button>
+        </div>
+        <button
+          onClick={handleAbsenceCopyNumbers}
+          className="w-full text-emerald-700 text-xs py-1"
+        >
+          {absenceNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
         </button>
       </div>
     </div>
