@@ -72,26 +72,26 @@ export default function Settings() {
   }
 
   if (loading) {
-    return <div className="text-center py-10 text-gray-500">جارٍ التحميل...</div>
+    return <div className="text-center py-10 text-gray-500 dark:text-gray-400">جارٍ التحميل...</div>
   }
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4">الإعدادات</h2>
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الإعدادات</h2>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">قيمة الاشتراك الشهري</p>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">قيمة الاشتراك الشهري</p>
         <form onSubmit={handleSave} className="space-y-3">
           <div className="relative">
             <input
               type="number"
               value={fee}
               onChange={(e) => setFee(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">د.ت</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 dark:text-gray-400">د.ت</span>
           </div>
-          {message && <p className="text-xs text-emerald-700">{message}</p>}
+          {message && <p className="text-xs text-emerald-700 dark:text-emerald-400">{message}</p>}
           <button
             type="submit"
             disabled={saving}
@@ -100,17 +100,17 @@ export default function Settings() {
             {saving ? "جارٍ الحفظ..." : "حفظ"}
           </button>
         </form>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
           هذا التغيير يطبق على الاشتراكات الجديدة ورسائل التذكير — لا يغيّر الاشتراكات المسجلة سابقًا.
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm">نسخة احتياطية من البيانات</p>
-        <p className="text-xs text-gray-500">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">نسخة احتياطية من البيانات</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           يقوم هذا الزر بتحميل ملف واحد يحتوي على جميع بيانات التطبيق (الأقسام، الطلاب، الفريق، الحضور، الاشتراكات، التقدم القرآني) كنسخة احتياطية.
         </p>
-        {backupError && <p className="text-xs text-red-600">{backupError}</p>}
+        {backupError && <p className="text-xs text-red-600 dark:text-red-400">{backupError}</p>}
         <button
           onClick={handleBackup}
           disabled={backupLoading}
