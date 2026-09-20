@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where } from "firebase/firestore"
+import { collection, onSnapshot, addDoc, updateDoc, doc, query, where } from "firebase/firestore"
 import { Search, Pencil, Phone } from "lucide-react"
 import { db } from "../firebase"
 import FAB from "../components/FAB"
@@ -40,14 +40,14 @@ export default function Students() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "students"), (snap) => {
-      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => !s.deletedAt))
     })
     return unsub
   }, [])
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "classes"), (snap) => {
-      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !c.deletedAt))
     })
     return unsub
   }, [])
@@ -119,7 +119,7 @@ export default function Students() {
         await updateDoc(doc(db, "students", editingId), data)
         logActivity("تعديل طالب", fullName)
       } else {
-        await addDoc(collection(db, "students"), data)
+        await addDoc(collection(db, "students"), { ...data, deletedAt: null })
         logActivity("إضافة طالب", fullName)
       }
       setSheetOpen(false)
@@ -129,9 +129,9 @@ export default function Students() {
   }
 
   const handleDelete = async (s) => {
-    if (confirm("هل تريد حذف هذا الطالب؟")) {
-      await deleteDoc(doc(db, "students", s.id))
-      logActivity("حذف طالب", s.name)
+    if (confirm("هل تريد نقل هذا الطالب إلى المحذوفات؟ يمكن استعادته خلال 7 أيام.")) {
+      await updateDoc(doc(db, "students", s.id), { deletedAt: Date.now() })
+      logActivity("نقل طالب إلى المحذوفات", s.name)
     }
   }
 
