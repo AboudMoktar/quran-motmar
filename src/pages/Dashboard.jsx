@@ -54,10 +54,20 @@ export default function Dashboard() {
     setOpenClasses((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
+  // Only students who are still active (not deleted, active !== false) count toward
+  // attendance rates — this keeps the dashboard dynamic: a rate never reflects a
+  // student who was later removed or deactivated, even if old attendance records
+  // for that student still exist in Firestore.
+  const activeStudentIds = new Set(students.filter((s) => s.active !== false).map((s) => s.id))
+
   const marksInRange = (docs, from, to, classId) =>
     docs
       .filter((a) => a.date >= from && a.date <= to && (!classId || a.classId === classId))
-      .flatMap((a) => Object.values(a.records || {}))
+      .flatMap((a) =>
+        Object.entries(a.records || {})
+          .filter(([studentId]) => activeStudentIds.has(studentId))
+          .map(([, present]) => present)
+      )
 
   const rateOf = (marks) => {
     if (marks.length === 0) return null
@@ -95,7 +105,11 @@ export default function Dashboard() {
     const studentCount = students.filter((s) => classIds.includes(s.classId)).length
     const marks = attendance
       .filter((a) => a.date >= startDate && a.date <= endDate && classIds.includes(a.classId))
-      .flatMap((a) => Object.values(a.records || {}))
+      .flatMap((a) =>
+        Object.entries(a.records || {})
+          .filter(([studentId]) => activeStudentIds.has(studentId))
+          .map(([, present]) => present)
+      )
     return {
       classCount: teacherClasses.length,
       studentCount,
