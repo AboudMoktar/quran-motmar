@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { collection, onSnapshot, query, where, doc, setDoc, getDocs } from "firebase/firestore"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
+import { classTimeLabel } from "./Classes"
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
 const DAYS_LABELS = {
@@ -130,7 +131,7 @@ export default function Attendance() {
 
         {selectedClass && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            أيام الحصص: {(selectedClass.days || []).map((d) => DAYS_LABELS[d]).join(" - ")} — {selectedClass.time}
+            أيام الحصص: {(selectedClass.days || []).map((d) => DAYS_LABELS[d]).join(" - ")} — {classTimeLabel(selectedClass)}
           </p>
         )}
 
