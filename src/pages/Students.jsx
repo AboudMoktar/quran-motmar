@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { collection, onSnapshot, addDoc, updateDoc, doc, query, where } from "firebase/firestore"
-import { Search, Pencil, Phone } from "lucide-react"
+import * as XLSX from "xlsx"
+import { Search, Pencil, Phone, Upload, Download, X } from "lucide-react"
 import { db } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
 import { logActivity } from "../utils/activityLog"
+import { useAuth } from "../context/AuthContext"
 
 function calculateAge(birthDate) {
   if (!birthDate) return null
@@ -28,7 +30,57 @@ const emptyForm = {
   active: true,
 }
 
+// Column header variants accepted in the imported Excel file (matched trimmed/lowercased)
+const COLUMN_ALIASES = {
+  firstName: ["الاسم", "الإسم", "الاسم الأول", "firstname", "first name"],
+  lastName: ["اللقب", "الاسم الأخير", "lastname", "last name"],
+  birthDate: ["تاريخ الولادة", "birthdate", "birth date"],
+  parentName: ["اسم الولي", "ولي الأمر", "parent", "parentname"],
+  parentPhone: ["هاتف الولي", "رقم هاتف الولي", "رقم الهاتف", "phone", "parentphone"],
+  level: ["المستوى", "المستوى القرآني", "level"],
+  className: ["القسم", "الفصل", "class", "classname"],
+  enrollDate: ["تاريخ التسجيل", "enrolldate", "enroll date"],
+  active: ["نشط", "الحالة", "active", "status"],
+}
+
+function normalizeHeader(h) {
+  return String(h || "").trim().toLowerCase()
+}
+
+function findValue(row, field) {
+  const aliases = COLUMN_ALIASES[field].map(normalizeHeader)
+  for (const key of Object.keys(row)) {
+    if (aliases.includes(normalizeHeader(key))) return row[key]
+  }
+  return undefined
+}
+
+function toDateString(value) {
+  if (!value) return ""
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  const str = String(value).trim()
+  // Already looks like YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str
+  // DD/MM/YYYY or DD-MM-YYYY
+  const m = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (m) {
+    const [, d, mo, y] = m
+    return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+  }
+  const parsed = new Date(str)
+  if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+  return ""
+}
+
+function toActiveBool(value) {
+  if (value === undefined || value === "") return true
+  const str = String(value).trim().toLowerCase()
+  if (["لا", "غير نشط", "false", "0", "no", "inactive"].includes(str)) return false
+  return true
+}
+
 export default function Students() {
+  const { isAdminLevel } = useAuth()
   const [students, setStudents] = useState([])
   const [classes, setClasses] = useState([])
   const [todayStatus, setTodayStatus] = useState({})
@@ -37,6 +89,13 @@ export default function Students() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState("")
+
+  const [importOpen, setImportOpen] = useState(false)
+  const [importRows, setImportRows] = useState([])
+  const [importErrors, setImportErrors] = useState([])
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "students"), (snap) => {
@@ -135,6 +194,142 @@ export default function Students() {
     }
   }
 
+  // ---------- Excel import ----------
+
+  const openImport = () => {
+    setImportRows([])
+    setImportErrors([])
+    setImportResult(null)
+    setImportOpen(true)
+  }
+
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        "الاسم": "محمد",
+        "اللقب": "بن علي",
+        "تاريخ الولادة": "2015-03-12",
+        "اسم الولي": "علي بن علي",
+        "هاتف الولي": "20123456",
+        "المستوى": "جزء عمّ",
+        "القسم": classes[0]?.name || "اسم القسم كما هو مسجل في التطبيق",
+        "تاريخ التسجيل": new Date().toISOString().slice(0, 10),
+        "نشط": "نعم",
+      },
+    ])
+    const wb = XLSX.utils.book_new()
+    wb.Workbook = { Views: [{ RTL: true }] }
+    XLSX.utils.book_append_sheet(wb, ws, "الطلاب")
+    XLSX.writeFile(wb, "نموذج_استيراد_الطلاب.xlsx")
+  }
+
+  const handleFileSelected = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result)
+        const wb = XLSX.read(data, { type: "array", cellDates: true })
+        const sheet = wb.Sheets[wb.SheetNames[0]]
+        const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" })
+
+        const existingKey = (firstName, lastName, classId) =>
+          `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${classId}`
+        const existingSet = new Set(
+          students.map((s) => existingKey(s.firstName || "", s.lastName || "", s.classId || ""))
+        )
+
+        const parsed = []
+        const errors = []
+        const seenInFile = new Set()
+
+        rawRows.forEach((row, idx) => {
+          const rowNum = idx + 2 // +1 for header row, +1 for 1-based
+          const firstName = String(findValue(row, "firstName") || "").trim()
+          const lastName = String(findValue(row, "lastName") || "").trim()
+          const birthDateRaw = findValue(row, "birthDate")
+          const birthDate = toDateString(birthDateRaw)
+          const parentName = String(findValue(row, "parentName") || "").trim()
+          const parentPhone = String(findValue(row, "parentPhone") || "").trim()
+          const level = String(findValue(row, "level") || "").trim()
+          const classNameRaw = String(findValue(row, "className") || "").trim()
+          const enrollDateRaw = findValue(row, "enrollDate")
+          const enrollDate = toDateString(enrollDateRaw) || new Date().toISOString().slice(0, 10)
+          const active = toActiveBool(findValue(row, "active"))
+
+          if (!firstName && !lastName && !classNameRaw) return // skip fully empty row
+
+          if (!firstName || !lastName) {
+            errors.push(`السطر ${rowNum}: الاسم واللقب مطلوبان`)
+            return
+          }
+          if (!birthDate) {
+            errors.push(`السطر ${rowNum}: تاريخ الولادة مفقود أو غير صالح`)
+            return
+          }
+          const cls = classes.find(
+            (c) => normalizeHeader(c.name) === normalizeHeader(classNameRaw)
+          )
+          if (!cls) {
+            errors.push(`السطر ${rowNum}: القسم "${classNameRaw}" غير موجود في التطبيق`)
+            return
+          }
+
+          const key = existingKey(firstName, lastName, cls.id)
+          if (existingSet.has(key) || seenInFile.has(key)) {
+            errors.push(`السطر ${rowNum}: "${firstName} ${lastName}" موجود مسبقاً في قسم "${cls.name}" — تم تجاهله`)
+            return
+          }
+          seenInFile.add(key)
+
+          parsed.push({
+            firstName,
+            lastName,
+            name: `${firstName} ${lastName}`,
+            birthDate,
+            parentName,
+            parentPhone,
+            level,
+            classId: cls.id,
+            className: cls.name,
+            enrollDate,
+            active,
+          })
+        })
+
+        setImportRows(parsed)
+        setImportErrors(errors)
+      } catch {
+        setImportErrors(["تعذّر قراءة الملف. تأكد من أنه بصيغة Excel صحيحة (.xlsx)."])
+        setImportRows([])
+      }
+    }
+    reader.readAsArrayBuffer(file)
+    e.target.value = ""
+  }
+
+  const handleConfirmImport = async () => {
+    if (importRows.length === 0) return
+    setImporting(true)
+    let success = 0
+    let failed = 0
+    for (const data of importRows) {
+      try {
+        await addDoc(collection(db, "students"), { ...data, deletedAt: null })
+        success++
+      } catch {
+        failed++
+      }
+    }
+    if (success > 0) {
+      logActivity("استيراد طلاب من Excel", `${success} طالب${success > 1 ? "ًا" : ""}`)
+    }
+    setImportResult({ success, failed })
+    setImportRows([])
+    setImporting(false)
+  }
+
   const renderTodayBadge = (studentId) => {
     if (!(studentId in todayStatus)) {
       return <span className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">لم يسجل حضور اليوم</span>
@@ -155,7 +350,18 @@ export default function Students() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الطلاب</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">الطلاب</h2>
+        {isAdminLevel && (
+          <button
+            onClick={openImport}
+            className="flex items-center gap-1.5 text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg px-3 py-1.5"
+          >
+            <Upload size={14} />
+            استيراد من Excel
+          </button>
+        )}
+      </div>
 
       <div className="relative mb-4">
         <Search size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -308,6 +514,96 @@ export default function Students() {
           </div>
           {error && <p className="text-red-600 dark:text-red-400 text-xs">{error}</p>}
         </form>
+      </BottomSheet>
+
+      <BottomSheet
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="استيراد الطلاب من Excel"
+        footer={
+          importRows.length > 0 ? (
+            <button
+              onClick={handleConfirmImport}
+              disabled={importing}
+              className="w-full bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-60"
+            >
+              {importing ? "جارٍ الاستيراد..." : `تأكيد استيراد ${importRows.length} طالب`}
+            </button>
+          ) : null
+        }
+      >
+        <div className="space-y-3">
+          {!importResult && (
+            <>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                الأعمدة المطلوبة: الاسم، اللقب، تاريخ الولادة، القسم (يجب أن يطابق اسم قسم موجود في التطبيق).
+                يمكن أيضاً إضافة: اسم الولي، هاتف الولي، المستوى، تاريخ التسجيل، نشط.
+              </p>
+              <button
+                onClick={handleDownloadTemplate}
+                className="w-full flex items-center justify-center gap-2 border border-gray-300 dark:border-gray-600 rounded-lg py-2 text-sm text-gray-700 dark:text-gray-300"
+              >
+                <Download size={14} />
+                تنزيل نموذج Excel فارغ
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileSelected}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 bg-emerald-700 text-white rounded-lg py-2 text-sm"
+              >
+                <Upload size={14} />
+                اختيار ملف Excel
+              </button>
+
+              {importErrors.length > 0 && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 space-y-1 max-h-40 overflow-y-auto">
+                  {importErrors.map((err, i) => (
+                    <p key={i} className="text-xs text-red-700 dark:text-red-300">{err}</p>
+                  ))}
+                </div>
+              )}
+
+              {importRows.length > 0 && (
+                <div className="space-y-1 max-h-56 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2">
+                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {importRows.length} طالب جاهز للاستيراد:
+                  </p>
+                  {importRows.map((r, i) => (
+                    <div key={i} className="text-xs text-gray-600 dark:text-gray-300 flex justify-between border-b border-gray-100 dark:border-gray-700 py-1 last:border-0">
+                      <span>{r.name}</span>
+                      <span className="text-gray-400 dark:text-gray-500">{r.className}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {importResult && (
+            <div className="text-center py-4 space-y-2">
+              <p className="text-emerald-700 dark:text-emerald-400 text-sm font-medium">
+                تم استيراد {importResult.success} طالب بنجاح
+              </p>
+              {importResult.failed > 0 && (
+                <p className="text-red-600 dark:text-red-400 text-xs">
+                  فشل استيراد {importResult.failed} سجل
+                </p>
+              )}
+              <button
+                onClick={() => setImportOpen(false)}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
+              >
+                <X size={14} /> إغلاق
+              </button>
+            </div>
+          )}
+        </div>
       </BottomSheet>
     </div>
   )
