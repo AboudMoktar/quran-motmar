@@ -16,7 +16,14 @@ const DAYS = [
   { key: "sat", label: "السبت" },
 ]
 
-const emptyForm = { name: "", level: "", teacherId: "", days: [], time: "" }
+const emptyForm = { name: "", level: "", teacherId: "", days: [], timeFrom: "", timeTo: "" }
+
+export function classTimeLabel(c) {
+  if (!c) return ""
+  if (c.timeFrom && c.timeTo) return `${c.timeFrom} - ${c.timeTo}`
+  if (c.timeFrom) return c.timeFrom
+  return c.time || ""
+}
 
 export default function Classes() {
   const [classes, setClasses] = useState([])
@@ -63,7 +70,8 @@ export default function Classes() {
       level: c.level || "",
       teacherId: c.teacherId || "",
       days: c.days || [],
-      time: c.time || "",
+      timeFrom: c.timeFrom || c.time || "",
+      timeTo: c.timeTo || "",
     })
     setError("")
     setSheetOpen(true)
@@ -72,8 +80,12 @@ export default function Classes() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    if (!form.name.trim() || !form.teacherId || form.days.length === 0 || !form.time) {
-      setError("يرجى ملء جميع الحقول واختيار يوم واحد على الأقل")
+    if (!form.name.trim() || !form.teacherId || form.days.length === 0 || !form.timeFrom || !form.timeTo) {
+      setError("يرجى ملء جميع الحقول واختيار يوم واحد على الأقل ووقت البداية والنهاية")
+      return
+    }
+    if (form.timeTo <= form.timeFrom) {
+      setError("وقت النهاية يجب أن يكون بعد وقت البداية")
       return
     }
     const teacher = teachers.find((t) => t.id === form.teacherId)
@@ -83,7 +95,8 @@ export default function Classes() {
       teacherId: form.teacherId,
       teacherName: teacher?.name || "",
       days: form.days,
-      time: form.time,
+      timeFrom: form.timeFrom,
+      timeTo: form.timeTo,
     }
     try {
       if (editingId) {
@@ -133,7 +146,7 @@ export default function Classes() {
             <div>
               <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{c.name}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">{c.level} - {c.teacherName}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">{dayLabels(c.days || [])} - {c.time}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">{dayLabels(c.days || [])} - {classTimeLabel(c)}</p>
             </div>
             <div className="flex items-center gap-3">
               <button onClick={() => openEdit(c)} className="text-emerald-700 dark:text-emerald-400">
@@ -207,12 +220,26 @@ export default function Classes() {
           </div>
 
           <label className="block text-sm text-gray-600 dark:text-gray-300">وقت الحصة</label>
-          <input
-            type="time"
-            value={form.time}
-            onChange={(e) => setForm({ ...form, time: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
-          />
+          <div className="flex gap-2 items-center">
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">من</label>
+              <input
+                type="time"
+                value={form.timeFrom}
+                onChange={(e) => setForm({ ...form, timeFrom: e.target.value })}
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">إلى</label>
+              <input
+                type="time"
+                value={form.timeTo}
+                onChange={(e) => setForm({ ...form, timeTo: e.target.value })}
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+          </div>
 
           {error && <p className="text-red-600 dark:text-red-400 text-xs">{error}</p>}
         </form>
