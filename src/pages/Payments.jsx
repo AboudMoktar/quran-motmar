@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react"
 import { collection, onSnapshot, query, where, addDoc, deleteDoc, doc } from "firebase/firestore"
-import { Search, ChevronDown, ChevronUp, Trash2 } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, Trash2, Printer } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 import { getMonthlyFee } from "./Settings"
-import { MONTHS, MONTH_LABELS, STATUS_LABELS, computeStudentMonth } from "../utils/finance"
+import { MONTHS, MONTH_LABELS, STATUS_LABELS, computeStudentMonth, monthLabel } from "../utils/finance"
 import { logActivity } from "../utils/activityLog"
+import { printReceipt } from "../utils/printReport"
 import BottomSheet from "../components/BottomSheet"
 
 const STATUS_STYLES = {
@@ -28,6 +29,7 @@ export default function Payments() {
   const [payments, setPayments] = useState([])
   const [exemptions, setExemptions] = useState([])
   const [expandedId, setExpandedId] = useState("")
+  const [sortOrder, setSortOrder] = useState("desc") // "desc" = الأحدث أولاً, "asc" = الأقدم أولاً
 
   const [formOpen, setFormOpen] = useState(false)
   const [formMode, setFormMode] = useState("payment")
@@ -150,6 +152,18 @@ export default function Payments() {
     }
   }
 
+  const handlePrintReceipt = (studentName, className, payment) => {
+    printReceipt({
+      studentName,
+      className,
+      monthText: monthLabel(payment.month || monthKey),
+      amount: payment.amount,
+      date: payment.paidDate,
+      note: payment.note,
+      receiptNo: payment.id ? payment.id.slice(0, 8).toUpperCase() : "",
+    })
+  }
+
   const filteredStudents = students.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase())
   )
@@ -187,9 +201,20 @@ export default function Payments() {
             className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          قيمة الاشتراك الشهري: {monthlyFee === null ? "..." : `${monthlyFee} د.ت`}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            قيمة الاشتراك الشهري: {monthlyFee === null ? "..." : `${monthlyFee} د.ت`}
+          </p>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1 text-xs dark:bg-gray-700 dark:text-white"
+            title="ترتيب سجل الدفعات حسب التاريخ"
+          >
+            <option value="desc">الأحدث أولاً</option>
+            <option value="asc">الأقدم أولاً</option>
+          </select>
+        </div>
       </div>
 
       {classId && (
@@ -210,10 +235,11 @@ export default function Payments() {
               const sExemptions = forStudent(exemptions, s.id)
               const stat = computeStudentMonth(sPayments, sExemptions, monthlyFee || 0)
               const expanded = expandedId === s.id
+              const sortMul = sortOrder === "desc" ? -1 : 1
               const history = [
                 ...sPayments.map((p) => ({ ...p, kind: "payment", d: p.paidDate })),
                 ...sExemptions.map((ex) => ({ ...ex, kind: "exemption", d: ex.date })),
-              ].sort((a, b) => (a.d < b.d ? 1 : -1))
+              ].sort((a, b) => (a.d < b.d ? 1 : a.d > b.d ? -1 : 0) * -sortMul)
 
               return (
                 <div key={s.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3">
@@ -247,11 +273,22 @@ export default function Payments() {
                                 {h.kind === "payment" ? "دفعة" : "إعفاء"} {h.amount} د.ت — {h.d}
                                 {h.kind === "exemption" && h.reason ? ` (${h.reason})` : ""}
                               </span>
-                              {isAdminLevel && (
-                                <button onClick={() => handleDeleteEntry(h.kind === "payment" ? "payments" : "exemptions", h)}>
-                                  <Trash2 size={14} className="text-red-500" />
-                                </button>
-                              )}
+                              <div className="flex items-center gap-3 shrink-0">
+                                {h.kind === "payment" && (
+                                  <button
+                                    onClick={() => handlePrintReceipt(s.name, s.className, h)}
+                                    className="text-emerald-700 dark:text-emerald-400"
+                                    title="طباعة وصل الدفع"
+                                  >
+                                    <Printer size={14} />
+                                  </button>
+                                )}
+                                {isAdminLevel && (
+                                  <button onClick={() => handleDeleteEntry(h.kind === "payment" ? "payments" : "exemptions", h)}>
+                                    <Trash2 size={14} className="text-red-500" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
