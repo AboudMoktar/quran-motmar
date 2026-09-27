@@ -82,3 +82,48 @@ export function printMultiSection({ title, sections }) {
   `
   setTimeout(() => window.print(), 100)
 }
+
+function receiptRow(label, value) {
+  return `
+    <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px dashed #ddd; font-size:14px;">
+      <span style="color:#555;">${label}</span>
+      <span style="font-weight:bold;">${value}</span>
+    </div>
+  `
+}
+
+export function printReceipt({ studentName, className, monthText, amount, date, note, receiptNo }) {
+  const root = document.getElementById("print-root")
+  if (!root) return
+  const today = new Date().toLocaleDateString("ar-TN")
+
+  root.innerHTML = `
+    ${baseStyle}
+    <div style="direction: rtl; font-family: sans-serif; padding: 24px; display:flex; justify-content:center;">
+      <div style="width:100%; max-width:460px; border:2px solid #047857; border-radius:10px; padding:24px;">
+        ${headerHtml()}
+        <h2 style="text-align:center; margin: 4px 0 2px 0; color:#047857;">وصل دفع اشتراك</h2>
+        ${receiptNo ? `<p style="text-align:center; font-size:11px; color:#888; margin:0 0 12px 0;">رقم الوصل: ${receiptNo}</p>` : `<p style="margin:0 0 12px 0;"></p>`}
+        <div style="margin-bottom: 8px;">
+          ${receiptRow("اسم الطالب", studentName)}
+          ${receiptRow("القسم", className || "-")}
+          ${receiptRow("الشهر", monthText)}
+          ${receiptRow("المبلغ المدفوع", `${amount} د.ت`)}
+          ${receiptRow("تاريخ الدفع", date)}
+          ${receiptRow("طريقة الدفع", "نقداً")}
+          ${note ? receiptRow("ملاحظة", note) : ""}
+        </div>
+        <p style="font-size:11px; color:#888; margin-top:12px;">تاريخ الإصدار: ${today}</p>
+        <div style="display:flex; justify-content:space-between; margin-top:48px;">
+          <div style="text-align:center; width:45%;">
+            <p style="border-top:1px solid #333; padding-top:4px; font-size:12px; margin:0;">إمضاء المسؤول</p>
+          </div>
+          <div style="text-align:center; width:45%;">
+            <p style="border-top:1px solid #333; padding-top:4px; font-size:12px; margin:0;">إمضاء ولي الأمر</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  setTimeout(() => window.print(), 100)
+}
