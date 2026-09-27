@@ -7,6 +7,7 @@ import { getMonthlyFee } from "./Settings"
 import { MONTHS, MONTH_LABELS, STATUS_LABELS, computeStudentMonth, monthLabel } from "../utils/finance"
 import { logActivity } from "../utils/activityLog"
 import { printReceipt } from "../utils/printReport"
+import { getNextReceiptNumber } from "../utils/receiptCounter"
 import BottomSheet from "../components/BottomSheet"
 
 const STATUS_STYLES = {
@@ -109,6 +110,8 @@ export default function Payments() {
     setSaving(true)
     try {
       if (formMode === "payment") {
+        const receiptYear = formDate.slice(0, 4)
+        const receiptNo = await getNextReceiptNumber(receiptYear)
         await addDoc(collection(db, "payments"), {
           studentId: formStudent.id,
           classId,
@@ -118,8 +121,9 @@ export default function Payments() {
           note: formNote.trim(),
           mode: "نقداً",
           recordedBy: user.uid,
+          receiptNo,
         })
-        logActivity("تسجيل دفعة", `${formStudent.name} — ${amount} د.ت`)
+        logActivity("تسجيل دفعة", `${formStudent.name} — ${amount} د.ت — وصل ${receiptNo}`)
       } else {
         if (!formReason.trim()) {
           setFormError("يرجى إدخال سبب الإعفاء")
@@ -160,7 +164,7 @@ export default function Payments() {
       amount: payment.amount,
       date: payment.paidDate,
       note: payment.note,
-      receiptNo: payment.id ? payment.id.slice(0, 8).toUpperCase() : "",
+      receiptNo: payment.receiptNo || "—",
     })
   }
 
@@ -272,6 +276,7 @@ export default function Payments() {
                               <span className="text-gray-600 dark:text-gray-300">
                                 {h.kind === "payment" ? "دفعة" : "إعفاء"} {h.amount} د.ت — {h.d}
                                 {h.kind === "exemption" && h.reason ? ` (${h.reason})` : ""}
+                                {h.kind === "payment" && h.receiptNo ? ` — وصل ${h.receiptNo}` : ""}
                               </span>
                               <div className="flex items-center gap-3 shrink-0">
                                 {h.kind === "payment" && (
