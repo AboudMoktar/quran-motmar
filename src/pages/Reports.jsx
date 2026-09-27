@@ -4,6 +4,7 @@ import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection } from "../utils/printReport"
 import { surahName, progressPercent } from "../utils/quran"
+import { classTimeLabel } from "./Classes"
 
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
@@ -43,7 +44,7 @@ export default function Reports() {
       "المستوى": c.level,
       "المعلم": c.teacherName,
       "الأيام": (c.days || []).map((d) => DAYS_LABELS[d]).join(" - "),
-      "الوقت": c.time,
+      "الوقت": classTimeLabel(c),
     }))
 
   const studentRows = () =>
