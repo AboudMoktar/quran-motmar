@@ -4,19 +4,17 @@ import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 import { classTimeLabel } from "./Classes"
 
-const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
   thu: "الخميس", fri: "الجمعة", sat: "السبت"
 }
 
 export default function Attendance() {
-  const { user, role, isAdminLevel } = useAuth()
+  const { user, role } = useAuth()
   const [classes, setClasses] = useState([])
   const [classId, setClassId] = useState("")
   const [students, setStudents] = useState([])
   const today = new Date().toISOString().slice(0, 10)
-  const todayKey = DAY_KEYS[new Date().getDay()]
   const [date, setDate] = useState(today)
   const [records, setRecords] = useState({})
   const [saving, setSaving] = useState(false)
@@ -110,8 +108,10 @@ export default function Attendance() {
   }, [classId, historyStudentId])
 
   const selectedClass = classes.find((c) => c.id === classId)
-  const classScheduledToday = selectedClass ? (selectedClass.days || []).includes(todayKey) : true
-  const canMark = isAdminLevel || (date === today && classScheduledToday)
+  // Teachers can now record attendance for their own class(es) on any date —
+  // the class list itself is already scoped to the teacher's classes, so no
+  // extra "today only" / "scheduled day only" restriction is needed here.
+  const canMark = !!classId
 
   return (
     <div>
@@ -135,24 +135,12 @@ export default function Attendance() {
           </p>
         )}
 
-        {isAdminLevel ? (
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
-          />
-        ) : (
-          <div className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
-            {date} (اليوم فقط)
-          </div>
-        )}
-
-        {selectedClass && !isAdminLevel && !classScheduledToday && (
-          <p className="text-red-600 dark:text-red-400 text-xs">
-            لا يوجد حصة لهذا القسم اليوم — التسجيل متاح فقط في أيام الحصص المحددة
-          </p>
-        )}
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+        />
       </div>
 
       {classId && canMark && (
