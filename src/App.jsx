@@ -45,7 +45,7 @@ function AppContent() {
         <Route path="/dashboard" element={<AdminRoute><Dashboard /></AdminRoute>} />
         <Route path="/teachers" element={<AdminRoute><Teachers /></AdminRoute>} />
         <Route path="/classes" element={<AdminRoute><Classes /></AdminRoute>} />
-        <Route path="/students" element={<AdminRoute><Students /></AdminRoute>} />
+        <Route path="/students" element={<Students />} />
         <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
         <Route path="/finance" element={<AdminRoute><Finance /></AdminRoute>} />
         <Route path="/messages" element={<AdminRoute><Messages /></AdminRoute>} />
