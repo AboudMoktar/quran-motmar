@@ -11,6 +11,7 @@ const ADMIN_TABS = [
 
 const TEACHER_TABS = [
   { to: "/attendance", label: "الحضور", icon: CalendarCheck },
+  { to: "/students", label: "الطلاب", icon: Users },
   { to: "/progress", label: "التقدم", icon: BookOpen },
   { to: "/payments", label: "الاشتراكات", icon: Users },
 ]
