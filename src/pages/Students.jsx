@@ -30,6 +30,8 @@ const emptyForm = {
   active: true,
 }
 
+const CLASS_CAPACITY = 20
+
 // Column header variants accepted in the imported Excel file (matched trimmed/lowercased)
 const COLUMN_ALIASES = {
   firstName: ["الاسم", "الإسم", "الاسم الأول", "firstname", "first name"],
@@ -160,6 +162,10 @@ export default function Students() {
     }
     const cls = classes.find((c) => c.id === form.classId)
     const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`
+    const currentSeats = students.filter(
+      (s) => s.classId === form.classId && !s.waitlisted && s.id !== editingId
+    ).length
+    const willWaitlist = currentSeats >= CLASS_CAPACITY
     const data = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
@@ -172,6 +178,7 @@ export default function Students() {
       className: cls?.name || "",
       enrollDate: form.enrollDate,
       active: form.active,
+      waitlisted: willWaitlist,
     }
     try {
       if (editingId) {
@@ -179,12 +186,27 @@ export default function Students() {
         logActivity("تعديل طالب", fullName)
       } else {
         await addDoc(collection(db, "students"), { ...data, deletedAt: null })
-        logActivity("إضافة طالب", fullName)
+        logActivity(willWaitlist ? "إضافة طالب (قائمة الانتظار)" : "إضافة طالب", fullName)
       }
       setSheetOpen(false)
+      if (willWaitlist) {
+        setTimeout(() => alert(`القسم "${cls?.name || ""}" ممتلئ (${CLASS_CAPACITY} طالب) — تمت إضافة الطالب إلى قائمة الانتظار`), 100)
+      }
     } catch {
       setError("حدث خطأ أثناء الحفظ")
     }
+  }
+
+  const handlePromote = async (s) => {
+    const currentSeats = students.filter(
+      (x) => x.classId === s.classId && !x.waitlisted && x.id !== s.id
+    ).length
+    if (currentSeats >= CLASS_CAPACITY) {
+      alert(`القسم ممتلئ (${CLASS_CAPACITY} طالب) — لا يمكن الترقية الآن`)
+      return
+    }
+    await updateDoc(doc(db, "students", s.id), { waitlisted: false })
+    logActivity("ترقية من قائمة الانتظار", s.name)
   }
 
   const handleDelete = async (s) => {
@@ -344,6 +366,17 @@ export default function Students() {
       ? <span className="text-xs px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">نشط</span>
       : <span className="text-xs px-2 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600">غير نشط</span>
 
+  const renderWaitlistBadge = (s) =>
+    s.waitlisted ? (
+      <span className="text-xs px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+        قائمة الانتظار
+      </span>
+    ) : null
+
+  const formClassSeats = form.classId
+    ? students.filter((s) => s.classId === form.classId && !s.waitlisted && s.id !== editingId).length
+    : 0
+
   const filteredStudents = students.filter((s) =>
     (s.name || "").toLowerCase().includes(search.toLowerCase())
   )
@@ -391,9 +424,11 @@ export default function Students() {
                       <button onClick={() => openEdit(s)} className="text-emerald-700 dark:text-emerald-400">
                         <Pencil size={16} />
                       </button>
-                      <button onClick={() => handleDelete(s)} className="text-red-600 dark:text-red-400 text-xs">
-                        حذف
-                      </button>
+                      {isAdminLevel && (
+                        <button onClick={() => handleDelete(s)} className="text-red-600 dark:text-red-400 text-xs">
+                          حذف
+                        </button>
+                      )}
                     </div>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">{s.className} — {s.level}</p>
@@ -407,9 +442,18 @@ export default function Students() {
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 flex-wrap items-center">
                 {renderTodayBadge(s.id)}
                 {renderActiveBadge(s.active)}
+                {renderWaitlistBadge(s)}
+                {s.waitlisted && (
+                  <button
+                    onClick={() => handlePromote(s)}
+                    className="text-xs px-2 py-1 rounded-lg bg-emerald-700 text-white"
+                  >
+                    ترقية من الانتظار
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -484,6 +528,12 @@ export default function Students() {
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
+          {form.classId && (
+            <p className={`text-xs ${formClassSeats >= CLASS_CAPACITY ? "text-amber-600 dark:text-amber-400" : "text-gray-500 dark:text-gray-400"}`}>
+              العدد الحالي: {formClassSeats}/{CLASS_CAPACITY}
+              {formClassSeats >= CLASS_CAPACITY && " — القسم ممتلئ، سيُضاف الطالب إلى قائمة الانتظار"}
+            </p>
+          )}
           <label className="block text-xs text-gray-500 dark:text-gray-400">تاريخ التسجيل</label>
           <input
             type="date"

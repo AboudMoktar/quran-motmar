@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { collection, onSnapshot, query, where, addDoc, deleteDoc, doc } from "firebase/firestore"
-import { Search, ChevronDown, ChevronUp, Trash2, Printer } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, Trash2, Printer, Zap } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 import { getMonthlyFee } from "./Settings"
@@ -31,6 +31,7 @@ export default function Payments() {
   const [exemptions, setExemptions] = useState([])
   const [expandedId, setExpandedId] = useState("")
   const [sortOrder, setSortOrder] = useState("desc") // "desc" = الأحدث أولاً, "asc" = الأقدم أولاً
+  const [quickPayingId, setQuickPayingId] = useState("")
 
   const [formOpen, setFormOpen] = useState(false)
   const [formMode, setFormMode] = useState("payment")
@@ -57,6 +58,26 @@ export default function Payments() {
     })
     return unsub
   }, [role, user])
+
+  // Restore last-used class once the class list is loaded, for faster reuse
+  useEffect(() => {
+    if (classId || classes.length === 0) return
+    try {
+      const lastClassId = localStorage.getItem("quran_motmar_last_payment_class")
+      if (lastClassId && classes.some((c) => c.id === lastClassId)) {
+        setClassId(lastClassId)
+      }
+    } catch {}
+  }, [classes]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectClass = (id) => {
+    setClassId(id)
+    setExpandedId("")
+    setSearch("")
+    try {
+      if (id) localStorage.setItem("quran_motmar_last_payment_class", id)
+    } catch {}
+  }
 
   useEffect(() => {
     if (!classId) { setStudents([]); return }
@@ -99,6 +120,36 @@ export default function Payments() {
     setFormOpen(true)
   }
 
+  const recordPayment = async (student, amount, date, note) => {
+    const receiptYear = date.slice(0, 4)
+    const receiptNo = await getNextReceiptNumber(receiptYear)
+    await addDoc(collection(db, "payments"), {
+      studentId: student.id,
+      classId,
+      month: monthKey,
+      amount,
+      paidDate: date,
+      note: note.trim(),
+      mode: "نقداً",
+      recordedBy: user.uid,
+      receiptNo,
+    })
+    logActivity("تسجيل دفعة", `${student.name} — ${amount} د.ت — وصل ${receiptNo}`)
+    return receiptNo
+  }
+
+  const handleQuickPay = async (s, remaining) => {
+    if (quickPayingId) return
+    if (!confirm(`تسجيل دفعة كاملة بقيمة ${remaining} د.ت لـ ${s.name}؟`)) return
+    setQuickPayingId(s.id)
+    try {
+      await recordPayment(s, remaining, new Date().toISOString().slice(0, 10), "")
+    } catch {
+      alert("حدث خطأ أثناء تسجيل الدفعة")
+    }
+    setQuickPayingId("")
+  }
+
   const handleFormSubmit = async (e) => {
     e.preventDefault()
     setFormError("")
@@ -110,20 +161,7 @@ export default function Payments() {
     setSaving(true)
     try {
       if (formMode === "payment") {
-        const receiptYear = formDate.slice(0, 4)
-        const receiptNo = await getNextReceiptNumber(receiptYear)
-        await addDoc(collection(db, "payments"), {
-          studentId: formStudent.id,
-          classId,
-          month: monthKey,
-          amount,
-          paidDate: formDate,
-          note: formNote.trim(),
-          mode: "نقداً",
-          recordedBy: user.uid,
-          receiptNo,
-        })
-        logActivity("تسجيل دفعة", `${formStudent.name} — ${amount} د.ت — وصل ${receiptNo}`)
+        await recordPayment(formStudent, amount, formDate, formNote)
       } else {
         if (!formReason.trim()) {
           setFormError("يرجى إدخال سبب الإعفاء")
@@ -179,7 +217,7 @@ export default function Payments() {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6 space-y-3">
         <select
           value={classId}
-          onChange={(e) => { setClassId(e.target.value); setExpandedId(""); setSearch("") }}
+          onChange={(e) => selectClass(e.target.value)}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         >
           <option value="">اختر القسم</option>
@@ -247,25 +285,38 @@ export default function Payments() {
 
               return (
                 <div key={s.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3">
-                  <button
-                    onClick={() => setExpandedId(expanded ? "" : s.id)}
-                    className="w-full flex items-center justify-between"
-                  >
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{s.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {stat.paid} / {stat.due} د.ت
-                        {stat.exempted > 0 && ` — معفى ${stat.exempted} د.ت`}
-                        {stat.remaining > 0 && ` — متبقي ${stat.remaining} د.ت`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-1 rounded-lg ${STATUS_STYLES[stat.status]}`}>
-                        {STATUS_LABELS[stat.status]}
-                      </span>
-                      {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-                    </div>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setExpandedId(expanded ? "" : s.id)}
+                      className="flex-1 flex items-center justify-between min-w-0"
+                    >
+                      <div className="text-right min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{s.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {stat.paid} / {stat.due} د.ت
+                          {stat.exempted > 0 && ` — معفى ${stat.exempted} د.ت`}
+                          {stat.remaining > 0 && ` — متبقي ${stat.remaining} د.ت`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-xs px-2 py-1 rounded-lg ${STATUS_STYLES[stat.status]}`}>
+                          {STATUS_LABELS[stat.status]}
+                        </span>
+                        {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                      </div>
+                    </button>
+                    {stat.remaining > 0 && (
+                      <button
+                        onClick={() => handleQuickPay(s, stat.remaining)}
+                        disabled={quickPayingId === s.id}
+                        title="دفعة كاملة بضغطة واحدة"
+                        className="shrink-0 flex items-center gap-1 bg-emerald-700 text-white rounded-lg px-2.5 py-2 text-xs disabled:opacity-60"
+                      >
+                        <Zap size={14} />
+                        {quickPayingId === s.id ? "..." : "دفع كامل"}
+                      </button>
+                    )}
+                  </div>
 
                   {expanded && (
                     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
