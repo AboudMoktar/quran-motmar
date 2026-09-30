@@ -17,6 +17,8 @@ const STATUS_STYLES = {
   exempt: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
 }
 
+const ALL_CLASSES = "__all__"
+
 export default function Payments() {
   const { user, role, isAdminLevel } = useAuth()
   const [classes, setClasses] = useState([])
@@ -81,7 +83,9 @@ export default function Payments() {
 
   useEffect(() => {
     if (!classId) { setStudents([]); return }
-    const q = query(collection(db, "students"), where("classId", "==", classId))
+    const q = classId === ALL_CLASSES
+      ? collection(db, "students")
+      : query(collection(db, "students"), where("classId", "==", classId))
     const unsub = onSnapshot(q, (snap) => {
       setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => !s.deletedAt))
     })
@@ -90,7 +94,9 @@ export default function Payments() {
 
   useEffect(() => {
     if (!classId) return
-    const q = query(collection(db, "payments"), where("classId", "==", classId), where("month", "==", monthKey))
+    const q = classId === ALL_CLASSES
+      ? query(collection(db, "payments"), where("month", "==", monthKey))
+      : query(collection(db, "payments"), where("classId", "==", classId), where("month", "==", monthKey))
     const unsub = onSnapshot(q, (snap) => {
       setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     })
@@ -99,7 +105,9 @@ export default function Payments() {
 
   useEffect(() => {
     if (!classId) return
-    const q = query(collection(db, "exemptions"), where("classId", "==", classId), where("month", "==", monthKey))
+    const q = classId === ALL_CLASSES
+      ? query(collection(db, "exemptions"), where("month", "==", monthKey))
+      : query(collection(db, "exemptions"), where("classId", "==", classId), where("month", "==", monthKey))
     const unsub = onSnapshot(q, (snap) => {
       setExemptions(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     })
@@ -125,7 +133,7 @@ export default function Payments() {
     const receiptNo = await getNextReceiptNumber(receiptYear)
     await addDoc(collection(db, "payments"), {
       studentId: student.id,
-      classId,
+      classId: student.classId || classId,
       month: monthKey,
       amount,
       paidDate: date,
@@ -170,7 +178,7 @@ export default function Payments() {
         }
         await addDoc(collection(db, "exemptions"), {
           studentId: formStudent.id,
-          classId,
+          classId: formStudent.classId || classId,
           month: monthKey,
           amount,
           reason: formReason.trim(),
@@ -221,6 +229,7 @@ export default function Payments() {
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         >
           <option value="">اختر القسم</option>
+          <option value={ALL_CLASSES}>كل الطلاب (كل الأقسام)</option>
           {classes.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -291,7 +300,12 @@ export default function Payments() {
                       className="flex-1 flex items-center justify-between min-w-0"
                     >
                       <div className="text-right min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{s.name}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                          {s.name}
+                          {classId === ALL_CLASSES && s.className && (
+                            <span className="text-xs font-normal text-gray-400 dark:text-gray-500"> — {s.className}</span>
+                          )}
+                        </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
                           {stat.paid} / {stat.due} د.ت
                           {stat.exempted > 0 && ` — معفى ${stat.exempted} د.ت`}
@@ -376,7 +390,7 @@ export default function Payments() {
             })}
             {filteredStudents.length === 0 && (
               <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-6">
-                {search ? "لا توجد نتائج" : "لا يوجد طلاب في هذا القسم"}
+                {search ? "لا توجد نتائج" : classId === ALL_CLASSES ? "لا يوجد طلاب بعد" : "لا يوجد طلاب في هذا القسم"}
               </p>
             )}
           </div>

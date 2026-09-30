@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
-import { collection, getDocs, query, where } from "firebase/firestore"
+import { collection, getDocs, onSnapshot, query, where } from "firebase/firestore"
 import { db } from "../firebase"
 import { ASSOCIATION_NAME, BRANCH_LABEL } from "../config"
 import { getMonthlyFee } from "./Settings"
+import { classTimeLabel } from "./Classes"
 
 const MONTHS = ["01","02","03","04","05","06","07","08","09","10","11","12"]
 const MONTH_LABELS = {
@@ -11,6 +12,18 @@ const MONTH_LABELS = {
   "09": "سبتمبر", "10": "أكتوبر", "11": "نوفمبر", "12": "ديسمبر"
 }
 const LOW_ATTENDANCE_THRESHOLD = 70
+
+const DAYS_LABELS = {
+  sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
+  thu: "الخميس", fri: "الجمعة", sat: "السبت"
+}
+
+function classScheduleLine(cls) {
+  if (!cls) return ""
+  const days = (cls.days || []).map((d) => DAYS_LABELS[d]).join(" - ")
+  const time = classTimeLabel(cls)
+  return [days, time].filter(Boolean).join(" — ")
+}
 
 function openSms(numbers, text) {
   const url = `sms:${numbers.join(",")}?body=${encodeURIComponent(text)}`
@@ -28,6 +41,8 @@ function daysAgo(n) {
 }
 
 export default function Messages() {
+  const [classes, setClasses] = useState([])
+  const [startClassId, setStartClassId] = useState("")
   const [startDate, setStartDate] = useState("")
   const [startText, setStartText] = useState("")
   const [startEdited, setStartEdited] = useState(false)
@@ -35,6 +50,15 @@ export default function Messages() {
   const [numbersCopied, setNumbersCopied] = useState(false)
   const [enrolledRecipients, setEnrolledRecipients] = useState([])
   const [loadingEnrolled, setLoadingEnrolled] = useState(false)
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "classes"), (snap) => {
+      setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !c.deletedAt))
+    })
+    return unsub
+  }, [])
+
+  const startClass = classes.find((c) => c.id === startClassId)
 
   const now = new Date()
   const [month, setMonth] = useState(MONTHS[now.getMonth()])
@@ -63,19 +87,24 @@ export default function Messages() {
   }, [])
 
   const defaultStartMessage = () => {
-    const dateLine = startDate ? `يوم ${startDate}` : ""
-    return [
+    const dateLine = startDate ? `يوم ${startDate}` : "التاريخ المحدد"
+    const className = startClass?.name || "القسم"
+    const scheduleLine = classScheduleLine(startClass)
+    const lines = [
       `السلام عليكم أولياء الأمور الكرام،`,
       ``,
-      `نعلمكم أن الدراسة القرآنية ${ASSOCIATION_NAME} ${BRANCH_LABEL} ستنطلق ${dateLine}.`,
-      ``,
-      `بارك الله فيكم`,
-    ].join("\n")
+      `نعلمكم أن حصة قسم "${className}" ${ASSOCIATION_NAME} ${BRANCH_LABEL} ستُقام ${dateLine}.`,
+    ]
+    if (scheduleLine) {
+      lines.push(`موعد الحصة: ${scheduleLine}`)
+    }
+    lines.push(``, `بارك الله فيكم`)
+    return lines.join("\n")
   }
 
   useEffect(() => {
     if (!startEdited) setStartText(defaultStartMessage())
-  }, [startDate])
+  }, [startDate, startClassId, classes]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const defaultPaymentMessage = (recipients) => {
     if (monthlyFee === null) return ""
@@ -115,10 +144,11 @@ export default function Messages() {
   }, [absenceIncludeNames, absenceRecipients])
 
   const loadEnrolled = async () => {
+    if (!startClassId) return []
     if (enrolledRecipients.length > 0) return enrolledRecipients
     setLoadingEnrolled(true)
     try {
-      const snap = await getDocs(collection(db, "students"))
+      const snap = await getDocs(query(collection(db, "students"), where("classId", "==", startClassId)))
       const students = snap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter((s) => !s.deletedAt && s.active !== false && s.parentPhone && s.parentPhone.trim())
@@ -236,7 +266,22 @@ export default function Messages() {
       <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الرسائل</h2>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">إعلام ببداية الدراسة</p>
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">إعلام أولياء الأمور بموعد الحصة (لكل قسم)</p>
+        <select
+          value={startClassId}
+          onChange={(e) => { setStartClassId(e.target.value); setEnrolledRecipients([]) }}
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+        >
+          <option value="">اختر القسم</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        {startClass && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            أيام وأوقات حصص هذا القسم: {classScheduleLine(startClass) || "غير محددة"}
+          </p>
+        )}
         <input
           type="date"
           value={startDate}
@@ -259,12 +304,12 @@ export default function Messages() {
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         />
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          المستلمون: جميع أولياء أمور الطلاب النشطين ({enrolledRecipients.length > 0 ? `${enrolledRecipients.length} رقم` : "سيتم تحميلهم عند الإرسال"})
+          المستلمون: أولياء أمور طلاب هذا القسم فقط ({enrolledRecipients.length > 0 ? `${enrolledRecipients.length} رقم` : startClassId ? "سيتم تحميلهم عند الإرسال" : "اختر قسماً أولاً"})
         </p>
         <div className="flex gap-2">
           <button
             onClick={handleStartSms}
-            disabled={loadingEnrolled}
+            disabled={loadingEnrolled || !startClassId}
             className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm disabled:opacity-60"
           >
             {loadingEnrolled ? "جارٍ التحميل..." : "فتح الرسائل"}
@@ -278,7 +323,8 @@ export default function Messages() {
         </div>
         <button
           onClick={handleStartCopyNumbers}
-          className="w-full text-emerald-700 dark:text-emerald-400 text-xs py-1"
+          disabled={!startClassId}
+          className="w-full text-emerald-700 dark:text-emerald-400 text-xs py-1 disabled:opacity-60"
         >
           {numbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
         </button>
