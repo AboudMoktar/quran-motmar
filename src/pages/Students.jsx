@@ -8,7 +8,7 @@ import BottomSheet from "../components/BottomSheet"
 import { logActivity } from "../utils/activityLog"
 import { useAuth } from "../context/AuthContext"
 
-function calculateAge(birthDate) {
+export function calculateAge(birthDate) {
   if (!birthDate) return null
   const today = new Date()
   const birth = new Date(birthDate)

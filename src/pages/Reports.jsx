@@ -5,6 +5,7 @@ import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection } from "../utils/printReport"
 import { surahName, progressPercent } from "../utils/quran"
 import { classTimeLabel } from "./Classes"
+import { calculateAge } from "./Students"
 
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
@@ -50,7 +51,7 @@ export default function Reports() {
   const studentRows = () =>
     students.map((s) => ({
       "الاسم": s.name,
-      "السن": s.age,
+      "السن": calculateAge(s.birthDate) ?? "-",
       "هاتف ولي الأمر": s.parentPhone,
       "المستوى": s.level,
       "القسم": s.className,
@@ -69,7 +70,7 @@ export default function Reports() {
         .filter((s) => s.classId === c.id)
         .map((s) => ({
           "الاسم": s.name,
-          "السن": s.age,
+          "السن": calculateAge(s.birthDate) ?? "-",
           "هاتف ولي الأمر": s.parentPhone,
           "المستوى": s.level,
           "تاريخ التسجيل": s.enrollDate,
