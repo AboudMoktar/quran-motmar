@@ -33,6 +33,17 @@ function dayNameForDate(dateStr) {
   return DAYS_LABELS[DAY_KEYS_BY_INDEX[idx]] || ""
 }
 
+// Formats a Date as a local YYYY-MM-DD string. toISOString() converts to UTC
+// first, which silently rolls the date back by one day for any positive UTC
+// offset (e.g. Tunisia, UTC+1) whenever it's applied to a local midnight —
+// exactly the bug that made "the next Sunday" come out as a Saturday.
+function toLocalISODate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
 // Finds the soonest date (today or later) that falls on one of the class's
 // scheduled days, so the announcement date follows the قسم's own timetable
 // instead of being picked manually every time.
@@ -45,7 +56,7 @@ function nextSessionDate(cls) {
   for (let i = 0; i < 14; i++) {
     const d = new Date(today)
     d.setDate(today.getDate() + i)
-    if (scheduledIndices.includes(d.getDay())) return d.toISOString().slice(0, 10)
+    if (scheduledIndices.includes(d.getDay())) return toLocalISODate(d)
   }
   return ""
 }
@@ -62,7 +73,7 @@ function copyText(text, onDone) {
 function daysAgo(n) {
   const d = new Date()
   d.setDate(d.getDate() - n)
-  return d.toISOString().slice(0, 10)
+  return toLocalISODate(d)
 }
 
 export default function Messages() {
@@ -98,7 +109,7 @@ export default function Messages() {
   const [unpaidRecipients, setUnpaidRecipients] = useState([])
 
   const [absenceFrom, setAbsenceFrom] = useState(daysAgo(30))
-  const [absenceTo, setAbsenceTo] = useState(now.toISOString().slice(0, 10))
+  const [absenceTo, setAbsenceTo] = useState(toLocalISODate(now))
   const [absenceText, setAbsenceText] = useState("")
   const [absenceEdited, setAbsenceEdited] = useState(false)
   const [absenceCopied, setAbsenceCopied] = useState(false)
