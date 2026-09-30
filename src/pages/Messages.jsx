@@ -18,11 +18,36 @@ const DAYS_LABELS = {
   thu: "الخميس", fri: "الجمعة", sat: "السبت"
 }
 
+const DAY_KEYS_BY_INDEX = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+
 function classScheduleLine(cls) {
   if (!cls) return ""
   const days = (cls.days || []).map((d) => DAYS_LABELS[d]).join(" - ")
   const time = classTimeLabel(cls)
   return [days, time].filter(Boolean).join(" — ")
+}
+
+function dayNameForDate(dateStr) {
+  if (!dateStr) return ""
+  const idx = new Date(`${dateStr}T00:00:00`).getDay()
+  return DAYS_LABELS[DAY_KEYS_BY_INDEX[idx]] || ""
+}
+
+// Finds the soonest date (today or later) that falls on one of the class's
+// scheduled days, so the announcement date follows the قسم's own timetable
+// instead of being picked manually every time.
+function nextSessionDate(cls) {
+  if (!cls || !(cls.days || []).length) return ""
+  const scheduledIndices = cls.days.map((d) => DAY_KEYS_BY_INDEX.indexOf(d)).filter((i) => i >= 0)
+  if (scheduledIndices.length === 0) return ""
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() + i)
+    if (scheduledIndices.includes(d.getDay())) return d.toISOString().slice(0, 10)
+  }
+  return ""
 }
 
 function openSms(numbers, text) {
@@ -87,20 +112,39 @@ export default function Messages() {
   }, [])
 
   const defaultStartMessage = () => {
-    const dateLine = startDate ? `يوم ${startDate}` : "التاريخ المحدد"
     const className = startClass?.name || "القسم"
-    const scheduleLine = classScheduleLine(startClass)
-    const lines = [
-      `السلام عليكم أولياء الأمور الكرام،`,
+    const dayLabel = startDate ? dayNameForDate(startDate) : "اليوم المحدد"
+    const timeFrom = startClass?.timeFrom || startClass?.time || ""
+    const timeTo = startClass?.timeTo || ""
+    const timeLine = timeFrom && timeTo
+      ? `من الساعة ${timeFrom} إلى ${timeTo}`
+      : timeFrom
+        ? `الساعة ${timeFrom}`
+        : "حسب التوقيت المعتاد"
+    return [
+      `السلام عليكم ورحمة الله وبركاته،`,
+      `أولياء الأمور الكرام،`,
+      `نعلمكم أن حصة قسم «${className}» بـ${BRANCH_LABEL}، التابع لـ${ASSOCIATION_NAME}، ستُقام في موعدها المحدد.`,
+      `📅 اليوم: ${dayLabel}`,
+      `🕝 التوقيت: ${timeLine}`,
       ``,
-      `نعلمكم أن حصة قسم "${className}" ${ASSOCIATION_NAME} ${BRANCH_LABEL} ستُقام ${dateLine}.`,
-    ]
-    if (scheduleLine) {
-      lines.push(`موعد الحصة: ${scheduleLine}`)
-    }
-    lines.push(``, `بارك الله فيكم`)
-    return lines.join("\n")
+      `بارك الله فيكم وجزاكم خيرًا.`,
+    ].join("\n")
   }
+
+  // Selecting a قسم automatically picks the next date matching its own
+  // scheduled days, instead of relying on a manually-typed date.
+  const handleStartClassChange = (id) => {
+    setStartClassId(id)
+    setEnrolledRecipients([])
+    const cls = classes.find((c) => c.id === id)
+    const suggested = nextSessionDate(cls)
+    if (suggested) setStartDate(suggested)
+  }
+
+  const startDayMismatch =
+    startClass && startDate && (startClass.days || []).length > 0 &&
+    !(startClass.days || []).includes(DAY_KEYS_BY_INDEX[new Date(`${startDate}T00:00:00`).getDay()])
 
   useEffect(() => {
     if (!startEdited) setStartText(defaultStartMessage())
@@ -269,7 +313,7 @@ export default function Messages() {
         <p className="font-medium text-sm text-gray-900 dark:text-gray-100">إعلام أولياء الأمور بموعد الحصة (لكل قسم)</p>
         <select
           value={startClassId}
-          onChange={(e) => { setStartClassId(e.target.value); setEnrolledRecipients([]) }}
+          onChange={(e) => handleStartClassChange(e.target.value)}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         >
           <option value="">اختر القسم</option>
@@ -288,6 +332,11 @@ export default function Messages() {
           onChange={(e) => setStartDate(e.target.value)}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
         />
+        {startDayMismatch && (
+          <p className="text-red-600 dark:text-red-400 text-xs">
+            تنبيه: هذا التاريخ ({dayNameForDate(startDate)}) ليس من أيام حصص هذا القسم
+          </p>
+        )}
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-500 dark:text-gray-400">نص الرسالة (قابل للتعديل)</p>
           <button
