@@ -132,58 +132,62 @@ export function printReceipt({ studentName, className, monthText, amount, date, 
 
 function miniReceiptRow(label, value) {
   return `
-    <div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dashed #ddd; font-size:10.5px;">
+    <div style="display:flex; justify-content:space-between; padding:1.5px 0; border-bottom:1px dashed #ddd; font-size:8.5px;">
       <span style="color:#555;">${label}</span>
       <span style="font-weight:bold;">${value}</span>
     </div>
   `
 }
 
-// Prints a batch of pre-issued receipts, 4 per A4 page (2x2 grid), each with
-// a dashed cutting border and a blank line for the payment date/signature to
-// be filled in by hand when the student actually pays during the month.
+// Prints a batch of pre-issued receipts, 8 per A4 page (2 columns x 4 rows),
+// each with a dashed cutting border and a blank line for the payment
+// date/signature to be filled in by hand when the student actually pays
+// during the month. Cards are laid out in the same order the receipt
+// numbers were assigned (class, then name), and since the grid runs inside
+// an RTL container the browser places card 1 at the top-right and fills
+// right-to-left, top-to-bottom — so numbers increment correctly as read.
 export function printReceiptsGrid({ monthText, receipts }) {
   const root = document.getElementById("print-root")
   if (!root || receipts.length === 0) return
+
+  const PER_PAGE = 8
 
   const cardHtml = (r) => {
     const isPaid = !!r.paidDate
     const dateValue = isPaid
       ? `<span style="color:#047857;">${r.paidDate} ✓</span>`
-      : "......................"
+      : "............."
     return `
-    <div style="border:1.5px dashed #047857; border-radius:8px; padding:10px; display:flex; flex-direction:column; overflow:hidden;">
-      <div style="display:flex; align-items:center; gap:6px; border-bottom:1px solid #047857; padding-bottom:4px; margin-bottom:6px;">
-        <img src="${LOGO_BASE64}" style="width:26px; height:26px; object-fit:contain;" />
-        <div style="font-size:8.5px; line-height:1.2;">
+    <div style="border:1.5px dashed #047857; border-radius:6px; padding:6px 8px; display:flex; flex-direction:column; overflow:hidden;">
+      <div style="display:flex; align-items:center; gap:4px; border-bottom:1px solid #047857; padding-bottom:2px; margin-bottom:3px;">
+        <img src="${LOGO_BASE64}" style="width:18px; height:18px; object-fit:contain; flex-shrink:0;" />
+        <div style="font-size:6.5px; line-height:1.15; overflow:hidden;">
           <div style="font-weight:bold;">${ASSOCIATION_NAME}</div>
           <div style="color:#555;">${BRANCH_LABEL}</div>
         </div>
       </div>
-      <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 2px 0; font-size:12px;">وصل دفع اشتراك — ${monthText}</p>
-      <p style="text-align:center; font-size:9px; color:#888; margin:0 0 6px 0;">رقم الوصل: ${r.receiptNo}</p>
+      <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 1px 0; font-size:10px;">وصل دفع اشتراك — ${monthText}</p>
+      <p style="text-align:center; font-size:7.5px; color:#888; margin:0 0 3px 0;">رقم الوصل: ${r.receiptNo}</p>
       ${miniReceiptRow("اسم الطالب", r.studentName)}
       ${miniReceiptRow("القسم", r.className || "-")}
       ${miniReceiptRow("المبلغ المستحق", `${r.amount} د.ت`)}
       ${miniReceiptRow("تاريخ الدفع", dateValue)}
-      <div style="display:flex; justify-content:center; margin-top:8px;">
-        <span style="border:1px dashed #999; border-radius:50%; width:34px; height:34px; display:flex; align-items:center; justify-content:center; font-size:7px; color:#999; text-align:center; line-height:1.1; flex-shrink:0;">ختم<br/>الجمعية</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:6px; gap:4px;">
-        <span style="border-top:1px solid #333; padding-top:2px; font-size:8px; width:48%; text-align:center;">إمضاء المسؤول</span>
-        <span style="border-top:1px solid #333; padding-top:2px; font-size:8px; width:48%; text-align:center;">إمضاء ولي الأمر</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; gap:3px;">
+        <span style="border-top:1px solid #333; padding-top:1px; font-size:6.5px; width:38%; text-align:center;">إمضاء المسؤول</span>
+        <span style="border:1px dashed #999; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:4.8px; color:#999; text-align:center; line-height:1; flex-shrink:0;">ختم<br/>الجمعية</span>
+        <span style="border-top:1px solid #333; padding-top:1px; font-size:6.5px; width:38%; text-align:center;">إمضاء ولي الأمر</span>
       </div>
     </div>
   `
   }
 
   const pages = []
-  for (let i = 0; i < receipts.length; i += 4) pages.push(receipts.slice(i, i + 4))
+  for (let i = 0; i < receipts.length; i += PER_PAGE) pages.push(receipts.slice(i, i + PER_PAGE))
 
   const pagesHtml = pages
     .map(
       (page, idx) => `
-        <div style="display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:6mm; width:190mm; height:270mm; box-sizing:border-box; ${idx < pages.length - 1 ? "page-break-after:always;" : ""}">
+        <div style="display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(4, 1fr); gap:4mm; width:190mm; height:270mm; box-sizing:border-box; ${idx < pages.length - 1 ? "page-break-after:always;" : ""}">
           ${page.map(cardHtml).join("")}
         </div>
       `
