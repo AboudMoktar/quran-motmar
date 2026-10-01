@@ -10,6 +10,17 @@ import { printReceipt } from "../utils/printReport"
 import { getOrCreateReceipt, registerReceiptPrint } from "../utils/receiptCounter"
 import BottomSheet from "../components/BottomSheet"
 
+// Local-timezone-safe equivalent of `date.toISOString().slice(0, 10)` —
+// toISOString() converts to UTC first, which shifts the calendar day back
+// by one between local midnight and 1am in Tunisia (UTC+1). Matters here
+// because handleQuickPay uses this as the actual recorded payment date.
+function toLocalISODate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
 const STATUS_STYLES = {
   paid: "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300",
   partial: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300",
@@ -39,7 +50,7 @@ export default function Payments() {
   const [formMode, setFormMode] = useState("payment")
   const [formStudent, setFormStudent] = useState(null)
   const [formAmount, setFormAmount] = useState("")
-  const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10))
+  const [formDate, setFormDate] = useState(toLocalISODate(new Date()))
   const [formNote, setFormNote] = useState("")
   const [formReason, setFormReason] = useState("")
   const [formError, setFormError] = useState("")
@@ -121,7 +132,7 @@ export default function Payments() {
     setFormStudent(student)
     setFormMode(mode)
     setFormAmount(String(stat.remaining || ""))
-    setFormDate(new Date().toISOString().slice(0, 10))
+    setFormDate(toLocalISODate(new Date()))
     setFormNote("")
     setFormReason("")
     setFormError("")
@@ -163,7 +174,7 @@ export default function Payments() {
     if (!confirm(`تسجيل دفعة كاملة بقيمة ${remaining} د.ت لـ ${s.name}؟`)) return
     setQuickPayingId(s.id)
     try {
-      await recordPayment(s, remaining, new Date().toISOString().slice(0, 10), "")
+      await recordPayment(s, remaining, toLocalISODate(new Date()), "")
     } catch {
       alert("حدث خطأ أثناء تسجيل الدفعة")
     }

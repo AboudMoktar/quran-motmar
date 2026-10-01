@@ -3,6 +3,16 @@ import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore"
 import { db } from "../firebase"
 import { MONTHLY_FEE as DEFAULT_FEE } from "../config"
 
+// Local-timezone-safe equivalent of `date.toISOString().slice(0, 10)` —
+// toISOString() converts to UTC first, which shifts the calendar day back
+// by one between local midnight and 1am in Tunisia (UTC+1).
+function toLocalISODate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
 export async function getMonthlyFee() {
   try {
     const snap = await getDoc(doc(db, "settings", "app"))
@@ -60,7 +70,7 @@ export default function Settings() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `quran-motmar-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `quran-motmar-backup-${toLocalISODate(new Date())}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

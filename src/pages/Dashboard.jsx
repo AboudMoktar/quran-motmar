@@ -5,6 +5,16 @@ import { db } from "../firebase"
 import { PAYMENT_ALERT_DAY } from "../config"
 import { getMonthlyFee } from "./Settings"
 
+// Local-timezone-safe equivalent of `date.toISOString().slice(0, 10)` —
+// toISOString() converts to UTC first, which shifts the calendar day back
+// by one between local midnight and 1am in Tunisia (UTC+1).
+function toLocalISODate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
 const LOW_ATTENDANCE_THRESHOLD = 70
 const MONTH_LABELS = {
   "01": "جانفي", "02": "فيفري", "03": "مارس", "04": "أفريل",
@@ -20,12 +30,12 @@ export default function Dashboard() {
   const [payments, setPayments] = useState([])
   const [monthlyFee, setMonthlyFee] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
-  const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
+  const [startDate, setStartDate] = useState(toLocalISODate(new Date()))
+  const [endDate, setEndDate] = useState(toLocalISODate(new Date()))
   const [openClasses, setOpenClasses] = useState({})
 
   const now = new Date()
-  const today = now.toISOString().slice(0, 10)
+  const today = toLocalISODate(now)
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
   const dayOfMonth = now.getDate()
 

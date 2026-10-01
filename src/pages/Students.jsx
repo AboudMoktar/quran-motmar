@@ -8,6 +8,19 @@ import BottomSheet from "../components/BottomSheet"
 import { logActivity } from "../utils/activityLog"
 import { useAuth } from "../context/AuthContext"
 
+// Local-timezone-safe equivalent of `date.toISOString().slice(0, 10)` —
+// toISOString() converts to UTC first, which shifts the calendar day back
+// by one between local midnight and 1am in Tunisia (UTC+1). Only for
+// "now" lookups below — NOT for toDateString()'s Date-object branch,
+// where the xlsx library already builds its dates in UTC, so
+// toISOString() there is the correct read, not a bug.
+function toLocalISODate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
 export function calculateAge(birthDate) {
   if (!birthDate) return null
   const today = new Date()
@@ -26,7 +39,7 @@ const emptyForm = {
   parentPhone: "",
   level: "",
   classId: "",
-  enrollDate: new Date().toISOString().slice(0, 10),
+  enrollDate: toLocalISODate(new Date()),
   active: true,
 }
 
@@ -114,7 +127,7 @@ export default function Students() {
   }, [])
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = toLocalISODate(new Date())
     const q = query(collection(db, "attendance"), where("date", "==", today))
     const unsub = onSnapshot(q, (snap) => {
       const map = {}
@@ -146,7 +159,7 @@ export default function Students() {
       parentPhone: s.parentPhone || "",
       level: s.level || "",
       classId: s.classId || "",
-      enrollDate: s.enrollDate || new Date().toISOString().slice(0, 10),
+      enrollDate: s.enrollDate || toLocalISODate(new Date()),
       active: s.active !== undefined ? s.active : true,
     })
     setError("")
@@ -235,7 +248,7 @@ export default function Students() {
         "هاتف الولي": "20123456",
         "المستوى": "جزء عمّ",
         "القسم": classes[0]?.name || "اسم القسم كما هو مسجل في التطبيق",
-        "تاريخ التسجيل": new Date().toISOString().slice(0, 10),
+        "تاريخ التسجيل": toLocalISODate(new Date()),
         "نشط": "نعم",
       },
     ])
@@ -277,7 +290,7 @@ export default function Students() {
           const level = String(findValue(row, "level") || "").trim()
           const classNameRaw = String(findValue(row, "className") || "").trim()
           const enrollDateRaw = findValue(row, "enrollDate")
-          const enrollDate = toDateString(enrollDateRaw) || new Date().toISOString().slice(0, 10)
+          const enrollDate = toDateString(enrollDateRaw) || toLocalISODate(new Date())
           const active = toActiveBool(findValue(row, "active"))
 
           if (!firstName && !lastName && !classNameRaw) return // skip fully empty row

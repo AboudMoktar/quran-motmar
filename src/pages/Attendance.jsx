@@ -4,6 +4,16 @@ import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 import { classTimeLabel } from "./Classes"
 
+// Local-timezone-safe equivalent of `date.toISOString().slice(0, 10)` —
+// toISOString() converts to UTC first, which shifts the calendar day back
+// by one between local midnight and 1am in Tunisia (UTC+1).
+function toLocalISODate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
   thu: "الخميس", fri: "الجمعة", sat: "السبت"
@@ -14,7 +24,7 @@ export default function Attendance() {
   const [classes, setClasses] = useState([])
   const [classId, setClassId] = useState("")
   const [students, setStudents] = useState([])
-  const today = new Date().toISOString().slice(0, 10)
+  const today = toLocalISODate(new Date())
   const [date, setDate] = useState(today)
   const [records, setRecords] = useState({})
   const [saving, setSaving] = useState(false)

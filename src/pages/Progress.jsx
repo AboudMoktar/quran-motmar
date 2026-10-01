@@ -4,12 +4,22 @@ import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 import { SURAHS, TAJWID_OPTIONS, HIFZ_OPTIONS, surahName, progressPercent } from "../utils/quran"
 
+// Local-timezone-safe equivalent of `date.toISOString().slice(0, 10)` —
+// toISOString() converts to UTC first, which shifts the calendar day back
+// by one between local midnight and 1am in Tunisia (UTC+1).
+function toLocalISODate(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
 export default function Progress() {
   const { user, role } = useAuth()
   const [classes, setClasses] = useState([])
   const [classId, setClassId] = useState("")
   const [students, setStudents] = useState([])
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(toLocalISODate(new Date()))
   const [records, setRecords] = useState({})
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
