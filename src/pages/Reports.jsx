@@ -804,9 +804,9 @@ export default function Reports() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mt-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">إصدار وصولات الشهر مسبقاً (4 بالصفحة)</p>
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">إصدار وصولات الشهر مسبقاً (8 بالصفحة)</p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          بنقرة واحدة: يُصدر وصل لكل طالب نشط لهذا الشهر برقم رسمي، ويُطبع 4 وصولات في كل صفحة A4 — حتى قبل أن يدفع معظم الطلاب، لتُملأ يدوياً (التاريخ والإمضاء) عند الدفع الفعلي.
+          بنقرة واحدة: يُصدر وصل لكل طالب نشط لهذا الشهر برقم رسمي، ويُطبع 8 وصولات في كل صفحة A4 — حتى قبل أن يدفع معظم الطلاب، لتُملأ يدوياً (التاريخ والإمضاء) عند الدفع الفعلي.
         </p>
         <select
           value={batchClassId}
