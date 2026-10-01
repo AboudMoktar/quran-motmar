@@ -92,15 +92,17 @@ function receiptRow(label, value) {
   `
 }
 
-export function printReceipt({ studentName, className, monthText, amount, date, note, receiptNo }) {
+export function printReceipt({ studentName, className, monthText, amount, date, note, receiptNo, duplicateCount }) {
   const root = document.getElementById("print-root")
   if (!root) return
   const today = new Date().toLocaleDateString("ar-TN")
+  const isDuplicate = duplicateCount && duplicateCount > 1
 
   root.innerHTML = `
     ${baseStyle}
     <div style="direction: rtl; font-family: sans-serif; padding: 24px; display:flex; justify-content:center;">
-      <div style="width:100%; max-width:460px; border:2px solid #047857; border-radius:10px; padding:24px;">
+      <div style="width:100%; max-width:460px; border:2px solid #047857; border-radius:10px; padding:24px; position:relative;">
+        ${isDuplicate ? `<div style="text-align:center; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:8px; padding:6px; font-size:13px; font-weight:bold; margin-bottom:10px;">⚠️ نسخة مكررة — طُبع هذا الوصل ${duplicateCount} مرات</div>` : ""}
         ${headerHtml()}
         <h2 style="text-align:center; margin: 4px 0 2px 0; color:#047857;">وصل دفع اشتراك</h2>
         ${receiptNo ? `<p style="text-align:center; font-size:11px; color:#888; margin:0 0 12px 0;">رقم الوصل: ${receiptNo}</p>` : `<p style="margin:0 0 12px 0;"></p>`}
