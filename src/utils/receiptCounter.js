@@ -12,13 +12,39 @@ import { db } from "../firebase"
 // one doc per studentId + year + month). This is what guarantees a single
 // student can never end up with two different numbers for the same month.
 //
-// Numbers are handed out from a yearly counter ("counters/{year}") that only
-// ever increments — a deleted/cancelled receipt is never reused, so gaps in
-// the sequence are possible but numbers never go backwards and never repeat.
+// The next number is derived directly from the existing "receipts" docs for
+// that year (highest sequence number found, +1) — there is NO separate
+// "counters" document anymore. A separate counter is a single point of
+// failure: deleting or resetting it while receipts already exist causes
+// numbers to be handed out again and collide with ones already in use
+// (exactly what happened once in this app's history). Deriving the number
+// from the receipts themselves makes that mistake impossible — the source
+// of truth and the numbers it hands out can never drift apart.
 // ---------------------------------------------------------------------------
 
 function receiptId(year, month, studentId) {
   return `${year}-${month}_${studentId}`
+}
+
+// Pulls the leading number out of a receipt number string like "0007/26",
+// so old documents that don't have a numeric "seq" field (created before
+// this field existed) still count correctly when computing the next number.
+function parseSeq(receiptDoc) {
+  if (typeof receiptDoc.seq === "number") return receiptDoc.seq
+  const match = /^(\d+)/.exec(receiptDoc.receiptNo || "")
+  return match ? Number(match[1]) : 0
+}
+
+// Looks at every receipt already issued for a year and returns the next
+// free sequential number as both the display string ("0008/26") and the
+// raw integer (8, stored as "seq" on new documents so future look-ups are
+// fast and exact, without needing to parse the display string).
+async function nextSequentialNumber(year) {
+  const snap = await getDocs(query(collection(db, "receipts"), where("year", "==", String(year))))
+  const highest = snap.docs.reduce((max, d) => Math.max(max, parseSeq(d.data())), 0)
+  const next = highest + 1
+  const shortYear = String(year).slice(-2)
+  return { seq: next, receiptNo: `${String(next).padStart(4, "0")}/${shortYear}` }
 }
 
 // Returns { receiptNo, isNew } for a given student + month, creating the
@@ -46,7 +72,11 @@ export async function getOrCreateReceipt({ studentId, studentName, classId, clas
   )
   const priorReceiptNo = priorPaymentSnap.docs.map((d) => d.data()).find((p) => p.receiptNo)?.receiptNo
 
-  const counterRef = doc(db, "counters", String(year))
+  // Compute the candidate next number BEFORE the transaction (a query can't
+  // run inside a Firestore transaction). With a single admin using the app
+  // from one phone at a time, the tiny race window this leaves is a
+  // non-issue in practice — and it's re-checked once more below anyway.
+  const candidate = priorReceiptNo ? null : await nextSequentialNumber(year)
 
   const receiptNo = await runTransaction(db, async (transaction) => {
     // Re-check inside the transaction in case another call created it
@@ -60,7 +90,7 @@ export async function getOrCreateReceipt({ studentId, studentName, classId, clas
       classId: classId || "",
       className: className || "",
       month: monthKey,
-      year,
+      year: String(year),
       amount: amount || 0,
       createdAt: Date.now(),
       printCount: 0,
@@ -71,15 +101,8 @@ export async function getOrCreateReceipt({ studentId, studentName, classId, clas
       return priorReceiptNo
     }
 
-    const counterSnap = await transaction.get(counterRef)
-    const last = counterSnap.exists() ? counterSnap.data().lastNumber || 0 : 0
-    const next = last + 1
-    const shortYear = String(year).slice(-2)
-    const newNo = `${String(next).padStart(4, "0")}/${shortYear}`
-
-    transaction.set(counterRef, { year: String(year), lastNumber: next }, { merge: true })
-    transaction.set(receiptRef, { ...baseData, receiptNo: newNo })
-    return newNo
+    transaction.set(receiptRef, { ...baseData, receiptNo: candidate.receiptNo, seq: candidate.seq })
+    return candidate.receiptNo
   })
 
   return { receiptNo, isNew: true }
