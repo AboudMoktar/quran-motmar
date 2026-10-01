@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { collection, getDocs, query, where, doc, updateDoc } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc } from "firebase/firestore"
 import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection, printReceipt, printReceiptsGrid } from "../utils/printReport"
@@ -61,6 +61,8 @@ export default function Reports() {
   const [batchResult, setBatchResult] = useState(null)
   const [batchProgress, setBatchProgress] = useState(null)
   const [batchPrintData, setBatchPrintData] = useState(null)
+  const [wipeLoading, setWipeLoading] = useState(false)
+  const [wipeResult, setWipeResult] = useState("")
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
@@ -406,6 +408,41 @@ export default function Reports() {
       setReceiptsError("تعذّرت إعادة الطباعة")
     }
     setReprintingId("")
+  }
+
+  // ---------- One-time dev cleanup: wipes ALL test receipts/payments so the
+  // sequence can genuinely restart at 0001. Driven from inside the app
+  // (same authenticated Firestore connection) instead of the Firebase
+  // console's "Supprimer la collection" on mobile, which only deletes
+  // documents in batches and can silently leave some behind on a slow
+  // connection — which is exactly what caused numbers to resume at 0016
+  // instead of 0001 after an apparently-complete console deletion.
+  const handleWipeTestReceipts = async () => {
+    if (
+      !window.confirm(
+        "سيتم حذف كل محتوى 'payments' و 'receipts' نهائياً (بيانات تجريبية فقط). لا يمكن التراجع. متابعة؟"
+      )
+    )
+      return
+    setWipeLoading(true)
+    setWipeResult("")
+    try {
+      const [paymentsSnap, receiptsSnap] = await Promise.all([
+        getDocs(collection(db, "payments")),
+        getDocs(collection(db, "receipts")),
+      ])
+      await Promise.all([
+        ...paymentsSnap.docs.map((d) => deleteDoc(d.ref)),
+        ...receiptsSnap.docs.map((d) => deleteDoc(d.ref)),
+      ])
+      setWipeResult(`تم حذف ${paymentsSnap.docs.length} دفعة و ${receiptsSnap.docs.length} وصل نهائياً.`)
+      setReceipts(null)
+      setBatchResult(null)
+      setBatchPrintData(null)
+    } catch (err) {
+      setWipeResult(`خطأ أثناء الحذف: ${err?.code || err?.message || "غير معروف"}`)
+    }
+    setWipeLoading(false)
   }
 
   // ---------- Monthly pre-issued receipts, ready to hand out on the 1st of
@@ -840,6 +877,21 @@ export default function Reports() {
         >
           إعادة ترقيم وإصدار من جديد لهذا الشهر (لحذف الترقيم القديم غير المرتّب)
         </button>
+
+        <div className="border-t border-dashed border-red-300 dark:border-red-800 pt-3 mt-1">
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+            للتجربة فقط: حذف نهائي لكل الدفوعات والوصولات في كامل التطبيق (كل الأشهر)، لإعادة الترقيم من 0001
+            بشكل مضمون 100٪. استعمله فقط قبل البدء الفعلي بالتطبيق.
+          </p>
+          {wipeResult && <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-2">{wipeResult}</p>}
+          <button
+            onClick={handleWipeTestReceipts}
+            disabled={wipeLoading}
+            className="w-full border border-red-400 text-red-700 dark:text-red-400 dark:border-red-700 rounded-lg py-2 text-xs font-bold disabled:opacity-60"
+          >
+            {wipeLoading ? "جارٍ الحذف..." : "🗑️ حذف نهائي لكل الدفوعات والوصولات (تجريبي)"}
+          </button>
+        </div>
       </div>
     </div>
   )
