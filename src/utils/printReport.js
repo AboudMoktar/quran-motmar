@@ -105,7 +105,11 @@ export function printReceipt({ studentName, className, monthText, amount, date, 
         ${isDuplicate ? `<div style="text-align:center; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:8px; padding:6px; font-size:13px; font-weight:bold; margin-bottom:10px;">⚠️ نسخة مكررة — طُبع هذا الوصل ${duplicateCount} مرات</div>` : ""}
         ${headerHtml()}
         <h2 style="text-align:center; margin: 4px 0 2px 0; color:#047857;">وصل دفع اشتراك</h2>
-        ${receiptNo ? `<p style="text-align:center; font-size:11px; color:#888; margin:0 0 12px 0;">رقم الوصل: ${receiptNo}</p>` : `<p style="margin:0 0 12px 0;"></p>`}
+        ${
+          receiptNo
+            ? `<p style="text-align:center; font-size:11px; color:#888; margin:0 0 12px 0;">رقم الوصل: ${receiptNo}${isDuplicate ? ` <span style="color:#b91c1c; font-weight:bold;">— COPIE</span>` : ""}</p>`
+            : `<p style="margin:0 0 12px 0;"></p>`
+        }
         <div style="margin-bottom: 8px;">
           ${receiptRow("اسم الطالب", studentName)}
           ${receiptRow("القسم", className || "-")}
@@ -168,7 +172,7 @@ export function printReceiptsGrid({ monthText, receipts }) {
           </div>
         </div>
         <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 1px 0; font-size:11.5px;">وصل دفع اشتراك — ${monthText}</p>
-        <p style="text-align:center; font-size:8.5px; color:#888; margin:0 0 3px 0;">رقم الوصل: ${r.receiptNo}</p>
+        <p style="text-align:center; font-size:8.5px; color:#888; margin:0 0 3px 0;">رقم الوصل: ${r.receiptNo}${r.isCopy ? ` <span style="color:#b91c1c; font-weight:bold;">— COPIE</span>` : ""}</p>
         ${miniReceiptRow("اسم الطالب", r.studentName)}
         ${miniReceiptRow("القسم", r.className || "-")}
         ${miniReceiptRow("المبلغ المستحق", `${r.amount} د.ت`)}
