@@ -434,10 +434,22 @@ export default function Reports() {
         existingByStudent[data.studentId] = data
       })
 
+      // Sort students into printing order FIRST (same order they'll appear
+      // on the page: by class, then by name), so receipt numbers are handed
+      // out in that same order and increment correctly as you read the
+      // page — not in whatever order Firestore happened to return them.
+      const orderedStudents = [...targetStudents].sort((a, b) => {
+        const clsA = classes.find((c) => c.id === a.classId)?.name || a.className || ""
+        const clsB = classes.find((c) => c.id === b.classId)?.name || b.className || ""
+        const byClass = clsA.localeCompare(clsB, "ar")
+        if (byClass !== 0) return byClass
+        return (a.name || "").localeCompare(b.name || "", "ar")
+      })
+
       const fee = await getMonthlyFee()
       const receiptsList = []
       let newlyIssued = 0
-      for (const s of targetStudents) {
+      for (const s of orderedStudents) {
         let entry = existingByStudent[s.id]
         if (!entry) {
           const receiptNo = await getNextReceiptNumber(batchYear)
