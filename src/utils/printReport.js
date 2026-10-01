@@ -129,3 +129,67 @@ export function printReceipt({ studentName, className, monthText, amount, date, 
   `
   setTimeout(() => window.print(), 100)
 }
+
+function miniReceiptRow(label, value) {
+  return `
+    <div style="display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dashed #ddd; font-size:10.5px;">
+      <span style="color:#555;">${label}</span>
+      <span style="font-weight:bold;">${value}</span>
+    </div>
+  `
+}
+
+// Prints a batch of pre-issued receipts, 4 per A4 page (2x2 grid), each with
+// a dashed cutting border and a blank line for the payment date/signature to
+// be filled in by hand when the student actually pays during the month.
+export function printReceiptsGrid({ monthText, receipts }) {
+  const root = document.getElementById("print-root")
+  if (!root || receipts.length === 0) return
+
+  const cardHtml = (r) => `
+    <div style="border:1.5px dashed #047857; border-radius:8px; padding:10px; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;">
+      <div>
+        <div style="display:flex; align-items:center; gap:6px; border-bottom:1px solid #047857; padding-bottom:4px; margin-bottom:6px;">
+          <img src="${LOGO_BASE64}" style="width:26px; height:26px; object-fit:contain;" />
+          <div style="font-size:8.5px; line-height:1.2;">
+            <div style="font-weight:bold;">${ASSOCIATION_NAME}</div>
+            <div style="color:#555;">${BRANCH_LABEL}</div>
+          </div>
+        </div>
+        <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 2px 0; font-size:12px;">وصل دفع اشتراك — ${monthText}</p>
+        <p style="text-align:center; font-size:9px; color:#888; margin:0 0 6px 0;">رقم الوصل: ${r.receiptNo}</p>
+        ${miniReceiptRow("اسم الطالب", r.studentName)}
+        ${miniReceiptRow("القسم", r.className || "-")}
+        ${miniReceiptRow("المبلغ المستحق", `${r.amount} د.ت`)}
+        ${miniReceiptRow("تاريخ الدفع", "......................")}
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:8px;">
+        <span style="border-top:1px solid #333; padding-top:2px; font-size:8.5px; width:45%; text-align:center;">إمضاء المسؤول</span>
+        <span style="border-top:1px solid #333; padding-top:2px; font-size:8.5px; width:45%; text-align:center;">إمضاء ولي الأمر</span>
+      </div>
+    </div>
+  `
+
+  const pages = []
+  for (let i = 0; i < receipts.length; i += 4) pages.push(receipts.slice(i, i + 4))
+
+  const pagesHtml = pages
+    .map(
+      (page, idx) => `
+        <div style="display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:6mm; width:190mm; height:270mm; box-sizing:border-box; ${idx < pages.length - 1 ? "page-break-after:always;" : ""}">
+          ${page.map(cardHtml).join("")}
+        </div>
+      `
+    )
+    .join("")
+
+  root.innerHTML = `
+    <style>
+      @page { size: A4; margin: 10mm; }
+    </style>
+    <div style="direction: rtl; font-family: sans-serif;">
+      ${pagesHtml}
+    </div>
+  `
+  setTimeout(() => window.print(), 100)
+}
