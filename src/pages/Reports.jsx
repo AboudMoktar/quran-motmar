@@ -59,6 +59,7 @@ export default function Reports() {
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchError, setBatchError] = useState("")
   const [batchResult, setBatchResult] = useState(null)
+  const [batchProgress, setBatchProgress] = useState(null)
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
@@ -424,6 +425,7 @@ export default function Reports() {
     setBatchLoading(true)
     setBatchError("")
     setBatchResult(null)
+    setBatchProgress(null)
     try {
       const monthKey = `${batchYear}-${batchMonth}`
       const targetStudents = students.filter(
@@ -454,7 +456,10 @@ export default function Reports() {
       const fee = await getMonthlyFee()
       const receiptsList = []
       let newlyIssued = 0
+      let i = 0
       for (const s of orderedStudents) {
+        i++
+        setBatchProgress({ done: i, total: orderedStudents.length })
         const cls = classes.find((c) => c.id === s.classId)
         const className = cls?.name || s.className || ""
         const { receiptNo, isNew } = await getOrCreateReceipt({
@@ -497,9 +502,10 @@ export default function Reports() {
 
       setBatchResult({ total: enrichedReceipts.length, newlyIssued })
       printReceiptsGrid({ monthText: monthLabel(monthKey), receipts: enrichedReceipts })
-    } catch {
-      setBatchError("حدث خطأ أثناء إصدار الوصولات")
+    } catch (err) {
+      setBatchError(`حدث خطأ أثناء إصدار الوصولات: ${err?.code || err?.message || "غير معروف"}`)
     }
+    setBatchProgress(null)
     setBatchLoading(false)
   }
 
@@ -785,6 +791,11 @@ export default function Reports() {
           />
         </div>
         {batchError && <p className="text-red-600 dark:text-red-400 text-xs">{batchError}</p>}
+        {batchProgress && (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            جارٍ المعالجة: {batchProgress.done} / {batchProgress.total}
+          </p>
+        )}
         {batchResult && (
           <p className="text-xs text-emerald-700 dark:text-emerald-400">
             {batchResult.total} وصل جاهز للطباعة ({batchResult.newlyIssued} وصل جديد
@@ -796,7 +807,7 @@ export default function Reports() {
           disabled={batchLoading}
           className="w-full bg-emerald-800 text-white rounded-lg py-2 text-sm disabled:opacity-60"
         >
-          {batchLoading ? "جارٍ الإصدار..." : "إصدار وطباعة وصولات الشهر"}
+          {batchLoading ? `جارٍ الإصدار... ${batchProgress ? `(${batchProgress.done}/${batchProgress.total})` : ""}` : "إصدار وطباعة وصولات الشهر"}
         </button>
         <button
           onClick={() => {
