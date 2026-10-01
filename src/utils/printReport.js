@@ -132,7 +132,7 @@ export function printReceipt({ studentName, className, monthText, amount, date, 
 
 function miniReceiptRow(label, value) {
   return `
-    <div style="display:flex; justify-content:space-between; padding:1.5px 0; border-bottom:1px dashed #ddd; font-size:8.5px;">
+    <div style="display:flex; justify-content:space-between; padding:2.5px 0; border-bottom:1px dashed #ddd; font-size:10px;">
       <span style="color:#555;">${label}</span>
       <span style="font-weight:bold;">${value}</span>
     </div>
@@ -158,24 +158,26 @@ export function printReceiptsGrid({ monthText, receipts }) {
       ? `<span style="color:#047857;">${r.paidDate} ✓</span>`
       : "............."
     return `
-    <div style="border:1.5px dashed #047857; border-radius:6px; padding:6px 8px; display:flex; flex-direction:column; overflow:hidden;">
-      <div style="display:flex; align-items:center; gap:4px; border-bottom:1px solid #047857; padding-bottom:2px; margin-bottom:3px;">
-        <img src="${LOGO_BASE64}" style="width:18px; height:18px; object-fit:contain; flex-shrink:0;" />
-        <div style="font-size:6.5px; line-height:1.15; overflow:hidden;">
-          <div style="font-weight:bold;">${ASSOCIATION_NAME}</div>
-          <div style="color:#555;">${BRANCH_LABEL}</div>
+    <div style="border:1.5px dashed #047857; border-radius:6px; padding:7px 9px; display:flex; flex-direction:column; justify-content:space-between; height:100%; box-sizing:border-box; overflow:hidden;">
+      <div>
+        <div style="display:flex; align-items:center; gap:4px; border-bottom:1px solid #047857; padding-bottom:2px; margin-bottom:3px;">
+          <img src="${LOGO_BASE64}" style="width:20px; height:20px; object-fit:contain; flex-shrink:0;" />
+          <div style="font-size:7.5px; line-height:1.15; overflow:hidden;">
+            <div style="font-weight:bold;">${ASSOCIATION_NAME}</div>
+            <div style="color:#555;">${BRANCH_LABEL}</div>
+          </div>
         </div>
+        <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 1px 0; font-size:11.5px;">وصل دفع اشتراك — ${monthText}</p>
+        <p style="text-align:center; font-size:8.5px; color:#888; margin:0 0 3px 0;">رقم الوصل: ${r.receiptNo}</p>
+        ${miniReceiptRow("اسم الطالب", r.studentName)}
+        ${miniReceiptRow("القسم", r.className || "-")}
+        ${miniReceiptRow("المبلغ المستحق", `${r.amount} د.ت`)}
+        ${miniReceiptRow("تاريخ الدفع", dateValue)}
       </div>
-      <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 1px 0; font-size:10px;">وصل دفع اشتراك — ${monthText}</p>
-      <p style="text-align:center; font-size:7.5px; color:#888; margin:0 0 3px 0;">رقم الوصل: ${r.receiptNo}</p>
-      ${miniReceiptRow("اسم الطالب", r.studentName)}
-      ${miniReceiptRow("القسم", r.className || "-")}
-      ${miniReceiptRow("المبلغ المستحق", `${r.amount} د.ت`)}
-      ${miniReceiptRow("تاريخ الدفع", dateValue)}
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; gap:3px;">
-        <span style="border-top:1px solid #333; padding-top:1px; font-size:6.5px; width:38%; text-align:center;">إمضاء المسؤول</span>
-        <span style="border:1px dashed #999; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:4.8px; color:#999; text-align:center; line-height:1; flex-shrink:0;">ختم<br/>الجمعية</span>
-        <span style="border-top:1px solid #333; padding-top:1px; font-size:6.5px; width:38%; text-align:center;">إمضاء ولي الأمر</span>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
+        <span style="border-top:1px solid #333; padding-top:2px; font-size:7.5px; width:38%; text-align:center;">إمضاء المسؤول</span>
+        <span style="border:1px dashed #999; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:5.5px; color:#999; text-align:center; line-height:1.1; flex-shrink:0;">ختم<br/>الجمعية</span>
+        <span style="border-top:1px solid #333; padding-top:2px; font-size:7.5px; width:38%; text-align:center;">إمضاء ولي الأمر</span>
       </div>
     </div>
   `
