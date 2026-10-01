@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react"
-import { collection, getDocs, query, where, doc, updateDoc, increment } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, setDoc, updateDoc, increment } from "firebase/firestore"
 import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
-import { printReport, printMultiSection, printReceipt } from "../utils/printReport"
+import { printReport, printMultiSection, printReceipt, printReceiptsGrid } from "../utils/printReport"
 import { surahName, progressPercent } from "../utils/quran"
 import { classTimeLabel } from "./Classes"
 import { calculateAge } from "./Students"
-import { monthLabel } from "../utils/finance"
+import { MONTHS, MONTH_LABELS, monthLabel } from "../utils/finance"
+import { getMonthlyFee } from "./Settings"
+import { getNextReceiptNumber } from "../utils/receiptCounter"
 
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
@@ -50,6 +52,13 @@ export default function Reports() {
   const [receiptsError, setReceiptsError] = useState("")
   const [receipts, setReceipts] = useState(null)
   const [reprintingId, setReprintingId] = useState("")
+
+  const [batchClassId, setBatchClassId] = useState("all")
+  const [batchMonth, setBatchMonth] = useState(MONTHS[new Date().getMonth()])
+  const [batchYear, setBatchYear] = useState(String(new Date().getFullYear()))
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [batchError, setBatchError] = useState("")
+  const [batchResult, setBatchResult] = useState(null)
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
@@ -396,6 +405,73 @@ export default function Reports() {
     setReprintingId("")
   }
 
+  // ---------- Monthly pre-issued receipts, ready to hand out on the 1st of
+  // the month (before most students have actually paid). These are NOT
+  // recorded as real payments — only their receipt number is reserved from
+  // the same yearly counter, in a dedicated "receipt_batches" collection, so
+  // finance calculations elsewhere stay untouched. Clicking the button again
+  // for the same month reuses the numbers already issued instead of burning
+  // new ones, so it's safe to re-print.
+  const handleIssueMonthlyReceipts = async () => {
+    setBatchLoading(true)
+    setBatchError("")
+    setBatchResult(null)
+    try {
+      const monthKey = `${batchYear}-${batchMonth}`
+      const targetStudents = students.filter(
+        (s) => s.active !== false && !s.waitlisted && (batchClassId === "all" || s.classId === batchClassId)
+      )
+      if (targetStudents.length === 0) {
+        setBatchError("لا يوجد طلاب نشطون لهذا الاختيار")
+        setBatchLoading(false)
+        return
+      }
+
+      const existingSnap = await getDocs(query(collection(db, "receipt_batches"), where("month", "==", monthKey)))
+      const existingByStudent = {}
+      existingSnap.docs.forEach((d) => {
+        const data = d.data()
+        existingByStudent[data.studentId] = data
+      })
+
+      const fee = await getMonthlyFee()
+      const receiptsList = []
+      let newlyIssued = 0
+      for (const s of targetStudents) {
+        let entry = existingByStudent[s.id]
+        if (!entry) {
+          const receiptNo = await getNextReceiptNumber(batchYear)
+          const cls = classes.find((c) => c.id === s.classId)
+          entry = {
+            studentId: s.id,
+            studentName: s.name,
+            classId: s.classId,
+            className: cls?.name || s.className || "",
+            month: monthKey,
+            receiptNo,
+            amount: fee,
+            issuedAt: Date.now(),
+          }
+          await setDoc(doc(db, "receipt_batches", `${monthKey}_${s.id}`), entry)
+          newlyIssued++
+        }
+        receiptsList.push(entry)
+      }
+
+      receiptsList.sort((a, b) => {
+        const byClass = (a.className || "").localeCompare(b.className || "", "ar")
+        if (byClass !== 0) return byClass
+        return (a.studentName || "").localeCompare(b.studentName || "", "ar")
+      })
+
+      setBatchResult({ total: receiptsList.length, newlyIssued })
+      printReceiptsGrid({ monthText: monthLabel(monthKey), receipts: receiptsList })
+    } catch {
+      setBatchError("حدث خطأ أثناء إصدار الوصولات")
+    }
+    setBatchLoading(false)
+  }
+
   return (
     <div>
       <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">التقارير</h2>
@@ -643,6 +719,54 @@ export default function Reports() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mt-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">إصدار وصولات الشهر مسبقاً (4 بالصفحة)</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          بنقرة واحدة: يُصدر وصل لكل طالب نشط لهذا الشهر برقم رسمي، ويُطبع 4 وصولات في كل صفحة A4 — حتى قبل أن يدفع معظم الطلاب، لتُملأ يدوياً (التاريخ والإمضاء) عند الدفع الفعلي.
+        </p>
+        <select
+          value={batchClassId}
+          onChange={(e) => setBatchClassId(e.target.value)}
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+        >
+          <option value="all">كل الأقسام</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <div className="flex gap-2">
+          <select
+            value={batchMonth}
+            onChange={(e) => setBatchMonth(e.target.value)}
+            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+          >
+            {MONTHS.map((m) => (
+              <option key={m} value={m}>{MONTH_LABELS[m]}</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            value={batchYear}
+            onChange={(e) => setBatchYear(e.target.value)}
+            className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+        {batchError && <p className="text-red-600 dark:text-red-400 text-xs">{batchError}</p>}
+        {batchResult && (
+          <p className="text-xs text-emerald-700 dark:text-emerald-400">
+            {batchResult.total} وصل جاهز للطباعة ({batchResult.newlyIssued} وصل جديد
+            {batchResult.total > batchResult.newlyIssued ? ` — ${batchResult.total - batchResult.newlyIssued} صدر مسبقاً وأُعيدت طباعته بنفس الرقم` : ""})
+          </p>
+        )}
+        <button
+          onClick={handleIssueMonthlyReceipts}
+          disabled={batchLoading}
+          className="w-full bg-emerald-800 text-white rounded-lg py-2 text-sm disabled:opacity-60"
+        >
+          {batchLoading ? "جارٍ الإصدار..." : "إصدار وطباعة وصولات الشهر"}
+        </button>
       </div>
     </div>
   )
