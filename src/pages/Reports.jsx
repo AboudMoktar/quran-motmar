@@ -60,6 +60,7 @@ export default function Reports() {
   const [batchError, setBatchError] = useState("")
   const [batchResult, setBatchResult] = useState(null)
   const [batchProgress, setBatchProgress] = useState(null)
+  const [batchPrintData, setBatchPrintData] = useState(null)
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
@@ -426,6 +427,7 @@ export default function Reports() {
     setBatchError("")
     setBatchResult(null)
     setBatchProgress(null)
+    setBatchPrintData(null)
     try {
       const monthKey = `${batchYear}-${batchMonth}`
       const targetStudents = students.filter(
@@ -501,7 +503,13 @@ export default function Reports() {
       }))
 
       setBatchResult({ total: enrichedReceipts.length, newlyIssued })
-      printReceiptsGrid({ monthText: monthLabel(monthKey), receipts: enrichedReceipts })
+      // Don't call printReceiptsGrid() here directly: on mobile browsers,
+      // window.print() silently does nothing if it fires too long after the
+      // original tap (here, several seconds of Firestore round-trips per
+      // student). Instead, save the data and let the "طباعة الآن" button
+      // below call printReceiptsGrid() directly from ITS OWN tap, which is
+      // immediate and reliably opens the print dialog.
+      setBatchPrintData({ monthText: monthLabel(monthKey), receipts: enrichedReceipts })
     } catch (err) {
       setBatchError(`حدث خطأ أثناء إصدار الوصولات: ${err?.code || err?.message || "غير معروف"}`)
     }
@@ -807,8 +815,16 @@ export default function Reports() {
           disabled={batchLoading}
           className="w-full bg-emerald-800 text-white rounded-lg py-2 text-sm disabled:opacity-60"
         >
-          {batchLoading ? `جارٍ الإصدار... ${batchProgress ? `(${batchProgress.done}/${batchProgress.total})` : ""}` : "إصدار وطباعة وصولات الشهر"}
+          {batchLoading ? `جارٍ الإصدار... ${batchProgress ? `(${batchProgress.done}/${batchProgress.total})` : ""}` : "إصدار وتجهيز وصولات الشهر"}
         </button>
+        {batchPrintData && (
+          <button
+            onClick={() => printReceiptsGrid(batchPrintData)}
+            className="w-full bg-blue-700 text-white rounded-lg py-2 text-sm font-bold"
+          >
+            🖨️ طباعة الآن ({batchPrintData.receipts.length} وصل)
+          </button>
+        )}
         <button
           onClick={() => {
             if (
