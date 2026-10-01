@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { collection, getDocs, query, where, doc, setDoc, updateDoc, increment, deleteDoc } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, updateDoc } from "firebase/firestore"
 import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection, printReceipt, printReceiptsGrid } from "../utils/printReport"
@@ -8,7 +8,7 @@ import { classTimeLabel } from "./Classes"
 import { calculateAge } from "./Students"
 import { MONTHS, MONTH_LABELS, monthLabel } from "../utils/finance"
 import { getMonthlyFee } from "./Settings"
-import { getNextReceiptNumber } from "../utils/receiptCounter"
+import { getOrCreateReceipt, registerReceiptPrint, resetUnpaidReceiptsForMonth } from "../utils/receiptCounter"
 
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
@@ -385,10 +385,11 @@ export default function Reports() {
     const cls = classes.find((c) => c.id === p.classId)
     setReprintingId(p.id)
     try {
-      await updateDoc(doc(db, "payments", p.id), { printCount: increment(1) })
-      setReceipts((prev) =>
-        prev ? prev.map((x) => (x.id === p.id ? { ...x, printCount: (x.printCount || 0) + 1 } : x)) : prev
-      )
+      const paymentMonthKey = p.month || ""
+      const [pYear, pMonth] = paymentMonthKey.split("-")
+      const nextCount = await registerReceiptPrint({ studentId: p.studentId, year: pYear, month: pMonth })
+      await updateDoc(doc(db, "payments", p.id), { printCount: nextCount })
+      setReceipts((prev) => (prev ? prev.map((x) => (x.id === p.id ? { ...x, printCount: nextCount } : x)) : prev))
       printReceipt({
         studentName: student?.name || p.studentName || "-",
         className: cls?.name || p.className || "-",
@@ -397,7 +398,7 @@ export default function Reports() {
         date: p.paidDate,
         note: p.note,
         receiptNo: p.receiptNo || "—",
-        duplicateCount: (p.printCount || 0) + 1,
+        duplicateCount: nextCount,
       })
     } catch {
       setReceiptsError("تعذّرت إعادة الطباعة")
@@ -406,18 +407,19 @@ export default function Reports() {
   }
 
   // ---------- Monthly pre-issued receipts, ready to hand out on the 1st of
-  // the month (before most students have actually paid). These are NOT
-  // recorded as real payments — only their receipt number is reserved from
-  // the same yearly counter, in a dedicated "receipt_batches" collection, so
-  // finance calculations elsewhere stay untouched. Clicking the button again
-  // for the same month reuses the numbers already issued instead of burning
-  // new ones, so it's safe to re-print.
+  // the month (before most students have actually paid). These go through
+  // the exact same getOrCreateReceipt()/"receipts" collection as a real
+  // payment recorded in الدفوعات — so a student who gets a pre-issued
+  // receipt here and then pays normally keeps the SAME number, and a
+  // student who already paid before this batch runs keeps THEIR number
+  // too. Re-running this for the same month never burns new numbers for
+  // students who already have one; it only prints them again (and marks
+  // them "COPIE" since registerReceiptPrint bumps their print count).
   //
-  // forceRegenerate=true wipes any already-issued receipt_batches docs for
-  // this month first, so every receipt gets a brand-new number in the
-  // current sorted (class, then name) order. Use this once to fix a batch
-  // that was issued before the ordering fix and ended up with scrambled
-  // numbers; it does NOT touch real payments, only the reserved numbers.
+  // forceRegenerate=true first deletes any reserved-but-never-actually-paid
+  // numbers for this month (receipts with no matching real payment), so
+  // they get fresh, cleanly ordered numbers. A receipt already tied to a
+  // real payment is never touched or renumbered.
   const handleIssueMonthlyReceipts = async (forceRegenerate = false) => {
     setBatchLoading(true)
     setBatchError("")
@@ -433,24 +435,14 @@ export default function Reports() {
         return
       }
 
-      const existingSnap = await getDocs(query(collection(db, "receipt_batches"), where("month", "==", monthKey)))
-
       if (forceRegenerate) {
-        await Promise.all(existingSnap.docs.map((d) => deleteDoc(d.ref)))
-      }
-
-      const existingByStudent = {}
-      if (!forceRegenerate) {
-        existingSnap.docs.forEach((d) => {
-          const data = d.data()
-          existingByStudent[data.studentId] = data
-        })
+        await resetUnpaidReceiptsForMonth(batchYear, batchMonth)
       }
 
       // Sort students into printing order FIRST (same order they'll appear
-      // on the page: by class, then by name), so receipt numbers are handed
-      // out in that same order and increment correctly as you read the
-      // page — not in whatever order Firestore happened to return them.
+      // on the page: by class, then by name), so any brand-new numbers are
+      // handed out in that same order and increment correctly as you read
+      // the page — not in whatever order Firestore happened to return them.
       const orderedStudents = [...targetStudents].sort((a, b) => {
         const clsA = classes.find((c) => c.id === a.classId)?.name || a.className || ""
         const clsB = classes.find((c) => c.id === b.classId)?.name || b.className || ""
@@ -463,24 +455,28 @@ export default function Reports() {
       const receiptsList = []
       let newlyIssued = 0
       for (const s of orderedStudents) {
-        let entry = existingByStudent[s.id]
-        if (!entry) {
-          const receiptNo = await getNextReceiptNumber(batchYear)
-          const cls = classes.find((c) => c.id === s.classId)
-          entry = {
-            studentId: s.id,
-            studentName: s.name,
-            classId: s.classId,
-            className: cls?.name || s.className || "",
-            month: monthKey,
-            receiptNo,
-            amount: fee,
-            issuedAt: Date.now(),
-          }
-          await setDoc(doc(db, "receipt_batches", `${monthKey}_${s.id}`), entry)
-          newlyIssued++
-        }
-        receiptsList.push(entry)
+        const cls = classes.find((c) => c.id === s.classId)
+        const className = cls?.name || s.className || ""
+        const { receiptNo, isNew } = await getOrCreateReceipt({
+          studentId: s.id,
+          studentName: s.name,
+          classId: s.classId,
+          className,
+          year: batchYear,
+          month: batchMonth,
+          amount: fee,
+        })
+        if (isNew) newlyIssued++
+        const printCount = await registerReceiptPrint({ studentId: s.id, year: batchYear, month: batchMonth })
+        receiptsList.push({
+          studentId: s.id,
+          studentName: s.name,
+          classId: s.classId,
+          className,
+          receiptNo,
+          amount: fee,
+          isCopy: printCount > 1,
+        })
       }
 
       // Dynamic part: look up who has actually paid for this month right now
@@ -498,12 +494,6 @@ export default function Reports() {
         ...r,
         paidDate: paidDateByStudent[r.studentId] || null,
       }))
-
-      enrichedReceipts.sort((a, b) => {
-        const byClass = (a.className || "").localeCompare(b.className || "", "ar")
-        if (byClass !== 0) return byClass
-        return (a.studentName || "").localeCompare(b.studentName || "", "ar")
-      })
 
       setBatchResult({ total: enrichedReceipts.length, newlyIssued })
       printReceiptsGrid({ monthText: monthLabel(monthKey), receipts: enrichedReceipts })
@@ -810,7 +800,11 @@ export default function Reports() {
         </button>
         <button
           onClick={() => {
-            if (window.confirm("سيتم حذف أرقام الوصولات الصادرة سابقاً لهذا الشهر وإصدار أرقام جديدة مرتبة. متابعة؟")) {
+            if (
+              window.confirm(
+                "سيتم حذف الأرقام المحجوزة غير المدفوعة فعلياً لهذا الشهر فقط وإعادة إصدارها مرتبة. أرقام أي طالب دفع فعلاً لن تتغيّر. متابعة؟"
+              )
+            ) {
               handleIssueMonthlyReceipts(true)
             }
           }}

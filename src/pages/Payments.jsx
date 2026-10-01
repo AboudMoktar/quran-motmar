@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, query, where, addDoc, deleteDoc, doc, updateDoc, increment } from "firebase/firestore"
+import { collection, onSnapshot, query, where, addDoc, deleteDoc, doc, updateDoc } from "firebase/firestore"
 import { Search, ChevronDown, ChevronUp, Trash2, Printer, Zap } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
@@ -7,7 +7,7 @@ import { getMonthlyFee } from "./Settings"
 import { MONTHS, MONTH_LABELS, STATUS_LABELS, computeStudentMonth, monthLabel } from "../utils/finance"
 import { logActivity } from "../utils/activityLog"
 import { printReceipt } from "../utils/printReport"
-import { getNextReceiptNumber } from "../utils/receiptCounter"
+import { getOrCreateReceipt, registerReceiptPrint } from "../utils/receiptCounter"
 import BottomSheet from "../components/BottomSheet"
 
 const STATUS_STYLES = {
@@ -129,8 +129,20 @@ export default function Payments() {
   }
 
   const recordPayment = async (student, amount, date, note) => {
-    const receiptYear = date.slice(0, 4)
-    const receiptNo = await getNextReceiptNumber(receiptYear)
+    // The receipt is tied to the SUBSCRIPTION month being paid (the page's
+    // selected year/month), not to the calendar date of the payment itself —
+    // this is what makes "même étudiant + même mois = même numéro" hold even
+    // for a late payment recorded the following month.
+    const cls = classes.find((c) => c.id === (student.classId || classId))
+    const { receiptNo } = await getOrCreateReceipt({
+      studentId: student.id,
+      studentName: student.name,
+      classId: student.classId || classId,
+      className: cls?.name || student.className || "",
+      year,
+      month,
+      amount,
+    })
     await addDoc(collection(db, "payments"), {
       studentId: student.id,
       classId: student.classId || classId,
@@ -203,9 +215,15 @@ export default function Payments() {
   }
 
   const handlePrintReceipt = async (studentName, className, payment) => {
-    const nextCount = (payment.printCount || 0) + 1
+    let nextCount = (payment.printCount || 0) + 1
     try {
-      await updateDoc(doc(db, "payments", payment.id), { printCount: increment(1) })
+      const paymentMonthKey = payment.month || monthKey
+      const [pYear, pMonth] = paymentMonthKey.split("-")
+      nextCount = await registerReceiptPrint({ studentId: payment.studentId, year: pYear, month: pMonth })
+      // Mirror the authoritative count onto the payment doc too, so other
+      // screens (the receipts register in التقارير) that read printCount
+      // straight off the payment stay in sync.
+      await updateDoc(doc(db, "payments", payment.id), { printCount: nextCount })
     } catch {
       // Printing still proceeds even if the counter update fails
     }
