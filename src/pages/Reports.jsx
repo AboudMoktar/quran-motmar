@@ -458,14 +458,30 @@ export default function Reports() {
         receiptsList.push(entry)
       }
 
-      receiptsList.sort((a, b) => {
+      // Dynamic part: look up who has actually paid for this month right now
+      // (even though most of the batch is printed before most people pay),
+      // so a receipt for someone who already paid shows their real payment
+      // date instead of a blank line to fill by hand.
+      const paymentsSnap = await getDocs(query(collection(db, "payments"), where("month", "==", monthKey)))
+      const paidDateByStudent = {}
+      paymentsSnap.docs.forEach((d) => {
+        const p = d.data()
+        const current = paidDateByStudent[p.studentId]
+        if (!current || p.paidDate > current) paidDateByStudent[p.studentId] = p.paidDate
+      })
+      const enrichedReceipts = receiptsList.map((r) => ({
+        ...r,
+        paidDate: paidDateByStudent[r.studentId] || null,
+      }))
+
+      enrichedReceipts.sort((a, b) => {
         const byClass = (a.className || "").localeCompare(b.className || "", "ar")
         if (byClass !== 0) return byClass
         return (a.studentName || "").localeCompare(b.studentName || "", "ar")
       })
 
-      setBatchResult({ total: receiptsList.length, newlyIssued })
-      printReceiptsGrid({ monthText: monthLabel(monthKey), receipts: receiptsList })
+      setBatchResult({ total: enrichedReceipts.length, newlyIssued })
+      printReceiptsGrid({ monthText: monthLabel(monthKey), receipts: enrichedReceipts })
     } catch {
       setBatchError("حدث خطأ أثناء إصدار الوصولات")
     }
