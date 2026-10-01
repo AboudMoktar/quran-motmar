@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { collection, getDocs, query, where, doc, setDoc, updateDoc, increment } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, setDoc, updateDoc, increment, deleteDoc } from "firebase/firestore"
 import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection, printReceipt, printReceiptsGrid } from "../utils/printReport"
@@ -412,7 +412,13 @@ export default function Reports() {
   // finance calculations elsewhere stay untouched. Clicking the button again
   // for the same month reuses the numbers already issued instead of burning
   // new ones, so it's safe to re-print.
-  const handleIssueMonthlyReceipts = async () => {
+  //
+  // forceRegenerate=true wipes any already-issued receipt_batches docs for
+  // this month first, so every receipt gets a brand-new number in the
+  // current sorted (class, then name) order. Use this once to fix a batch
+  // that was issued before the ordering fix and ended up with scrambled
+  // numbers; it does NOT touch real payments, only the reserved numbers.
+  const handleIssueMonthlyReceipts = async (forceRegenerate = false) => {
     setBatchLoading(true)
     setBatchError("")
     setBatchResult(null)
@@ -428,11 +434,18 @@ export default function Reports() {
       }
 
       const existingSnap = await getDocs(query(collection(db, "receipt_batches"), where("month", "==", monthKey)))
+
+      if (forceRegenerate) {
+        await Promise.all(existingSnap.docs.map((d) => deleteDoc(d.ref)))
+      }
+
       const existingByStudent = {}
-      existingSnap.docs.forEach((d) => {
-        const data = d.data()
-        existingByStudent[data.studentId] = data
-      })
+      if (!forceRegenerate) {
+        existingSnap.docs.forEach((d) => {
+          const data = d.data()
+          existingByStudent[data.studentId] = data
+        })
+      }
 
       // Sort students into printing order FIRST (same order they'll appear
       // on the page: by class, then by name), so receipt numbers are handed
@@ -789,11 +802,22 @@ export default function Reports() {
           </p>
         )}
         <button
-          onClick={handleIssueMonthlyReceipts}
+          onClick={() => handleIssueMonthlyReceipts(false)}
           disabled={batchLoading}
           className="w-full bg-emerald-800 text-white rounded-lg py-2 text-sm disabled:opacity-60"
         >
           {batchLoading ? "جارٍ الإصدار..." : "إصدار وطباعة وصولات الشهر"}
+        </button>
+        <button
+          onClick={() => {
+            if (window.confirm("سيتم حذف أرقام الوصولات الصادرة سابقاً لهذا الشهر وإصدار أرقام جديدة مرتبة. متابعة؟")) {
+              handleIssueMonthlyReceipts(true)
+            }
+          }}
+          disabled={batchLoading}
+          className="w-full border border-red-300 text-red-700 dark:text-red-400 dark:border-red-700 rounded-lg py-2 text-xs disabled:opacity-60"
+        >
+          إعادة ترقيم وإصدار من جديد لهذا الشهر (لحذف الترقيم القديم غير المرتّب)
         </button>
       </div>
     </div>
