@@ -146,7 +146,12 @@ export function printReceiptsGrid({ monthText, receipts }) {
   const root = document.getElementById("print-root")
   if (!root || receipts.length === 0) return
 
-  const cardHtml = (r) => `
+  const cardHtml = (r) => {
+    const isPaid = !!r.paidDate
+    const dateValue = isPaid
+      ? `<span style="color:#047857;">${r.paidDate} ✓</span>`
+      : "......................"
+    return `
     <div style="border:1.5px dashed #047857; border-radius:8px; padding:10px; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;">
       <div>
         <div style="display:flex; align-items:center; gap:6px; border-bottom:1px solid #047857; padding-bottom:4px; margin-bottom:6px;">
@@ -161,14 +166,16 @@ export function printReceiptsGrid({ monthText, receipts }) {
         ${miniReceiptRow("اسم الطالب", r.studentName)}
         ${miniReceiptRow("القسم", r.className || "-")}
         ${miniReceiptRow("المبلغ المستحق", `${r.amount} د.ت`)}
-        ${miniReceiptRow("تاريخ الدفع", "......................")}
+        ${miniReceiptRow("تاريخ الدفع", dateValue)}
       </div>
-      <div style="display:flex; justify-content:space-between; margin-top:8px;">
-        <span style="border-top:1px solid #333; padding-top:2px; font-size:8.5px; width:45%; text-align:center;">إمضاء المسؤول</span>
-        <span style="border-top:1px solid #333; padding-top:2px; font-size:8.5px; width:45%; text-align:center;">إمضاء ولي الأمر</span>
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px; gap:4px;">
+        <span style="border-top:1px solid #333; padding-top:2px; font-size:8px; width:32%; text-align:center;">إمضاء المسؤول</span>
+        <span style="border:1px dashed #999; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-size:6.5px; color:#999; text-align:center; line-height:1.1; flex-shrink:0;">ختم<br/>الجمعية</span>
+        <span style="border-top:1px solid #333; padding-top:2px; font-size:8px; width:32%; text-align:center;">إمضاء ولي الأمر</span>
       </div>
     </div>
   `
+  }
 
   const pages = []
   for (let i = 0; i < receipts.length; i += 4) pages.push(receipts.slice(i, i + 4))
