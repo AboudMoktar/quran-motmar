@@ -152,26 +152,26 @@ export function printReceiptsGrid({ monthText, receipts }) {
       ? `<span style="color:#047857;">${r.paidDate} ✓</span>`
       : "......................"
     return `
-    <div style="border:1.5px dashed #047857; border-radius:8px; padding:10px; display:flex; flex-direction:column; justify-content:space-between; overflow:hidden;">
-      <div>
-        <div style="display:flex; align-items:center; gap:6px; border-bottom:1px solid #047857; padding-bottom:4px; margin-bottom:6px;">
-          <img src="${LOGO_BASE64}" style="width:26px; height:26px; object-fit:contain;" />
-          <div style="font-size:8.5px; line-height:1.2;">
-            <div style="font-weight:bold;">${ASSOCIATION_NAME}</div>
-            <div style="color:#555;">${BRANCH_LABEL}</div>
-          </div>
+    <div style="border:1.5px dashed #047857; border-radius:8px; padding:10px; display:flex; flex-direction:column; overflow:hidden;">
+      <div style="display:flex; align-items:center; gap:6px; border-bottom:1px solid #047857; padding-bottom:4px; margin-bottom:6px;">
+        <img src="${LOGO_BASE64}" style="width:26px; height:26px; object-fit:contain;" />
+        <div style="font-size:8.5px; line-height:1.2;">
+          <div style="font-weight:bold;">${ASSOCIATION_NAME}</div>
+          <div style="color:#555;">${BRANCH_LABEL}</div>
         </div>
-        <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 2px 0; font-size:12px;">وصل دفع اشتراك — ${monthText}</p>
-        <p style="text-align:center; font-size:9px; color:#888; margin:0 0 6px 0;">رقم الوصل: ${r.receiptNo}</p>
-        ${miniReceiptRow("اسم الطالب", r.studentName)}
-        ${miniReceiptRow("القسم", r.className || "-")}
-        ${miniReceiptRow("المبلغ المستحق", `${r.amount} د.ت`)}
-        ${miniReceiptRow("تاريخ الدفع", dateValue)}
       </div>
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px; gap:4px;">
-        <span style="border-top:1px solid #333; padding-top:2px; font-size:8px; width:32%; text-align:center;">إمضاء المسؤول</span>
-        <span style="border:1px dashed #999; border-radius:50%; width:30px; height:30px; display:flex; align-items:center; justify-content:center; font-size:6.5px; color:#999; text-align:center; line-height:1.1; flex-shrink:0;">ختم<br/>الجمعية</span>
-        <span style="border-top:1px solid #333; padding-top:2px; font-size:8px; width:32%; text-align:center;">إمضاء ولي الأمر</span>
+      <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 2px 0; font-size:12px;">وصل دفع اشتراك — ${monthText}</p>
+      <p style="text-align:center; font-size:9px; color:#888; margin:0 0 6px 0;">رقم الوصل: ${r.receiptNo}</p>
+      ${miniReceiptRow("اسم الطالب", r.studentName)}
+      ${miniReceiptRow("القسم", r.className || "-")}
+      ${miniReceiptRow("المبلغ المستحق", `${r.amount} د.ت`)}
+      ${miniReceiptRow("تاريخ الدفع", dateValue)}
+      <div style="display:flex; justify-content:center; margin-top:8px;">
+        <span style="border:1px dashed #999; border-radius:50%; width:34px; height:34px; display:flex; align-items:center; justify-content:center; font-size:7px; color:#999; text-align:center; line-height:1.1; flex-shrink:0;">ختم<br/>الجمعية</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:6px; gap:4px;">
+        <span style="border-top:1px solid #333; padding-top:2px; font-size:8px; width:48%; text-align:center;">إمضاء المسؤول</span>
+        <span style="border-top:1px solid #333; padding-top:2px; font-size:8px; width:48%; text-align:center;">إمضاء ولي الأمر</span>
       </div>
     </div>
   `
