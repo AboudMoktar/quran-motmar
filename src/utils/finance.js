@@ -24,7 +24,14 @@ export function monthsInRange(startKey, endKey) {
 
 export function lastDayOfMonth(monthKey) {
   const [y, m] = monthKey.split("-").map(Number)
-  return new Date(y, m, 0).toISOString().slice(0, 10)
+  // Build the date from its LOCAL fields instead of toISOString() (which
+  // converts to UTC first and shifts the day back by one for any
+  // positive UTC offset, e.g. Tunisia UTC+1 — this always reproduced,
+  // not just near midnight, since it's a fixed offset on a fixed date).
+  const d = new Date(y, m, 0) // local midnight on the month's last day
+  const mm = String(d.getMonth() + 1).padStart(2, "0")
+  const dd = String(d.getDate()).padStart(2, "0")
+  return `${d.getFullYear()}-${mm}-${dd}`
 }
 
 export const STATUS_LABELS = {
