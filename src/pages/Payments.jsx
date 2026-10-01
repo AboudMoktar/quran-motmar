@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, query, where, addDoc, deleteDoc, doc } from "firebase/firestore"
+import { collection, onSnapshot, query, where, addDoc, deleteDoc, doc, updateDoc, increment } from "firebase/firestore"
 import { Search, ChevronDown, ChevronUp, Trash2, Printer, Zap } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
@@ -202,7 +202,13 @@ export default function Payments() {
     }
   }
 
-  const handlePrintReceipt = (studentName, className, payment) => {
+  const handlePrintReceipt = async (studentName, className, payment) => {
+    const nextCount = (payment.printCount || 0) + 1
+    try {
+      await updateDoc(doc(db, "payments", payment.id), { printCount: increment(1) })
+    } catch {
+      // Printing still proceeds even if the counter update fails
+    }
     printReceipt({
       studentName,
       className,
@@ -211,6 +217,7 @@ export default function Payments() {
       date: payment.paidDate,
       note: payment.note,
       receiptNo: payment.receiptNo || "—",
+      duplicateCount: nextCount,
     })
   }
 
