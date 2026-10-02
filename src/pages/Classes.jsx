@@ -4,6 +4,8 @@ import { Search, Pencil } from "lucide-react"
 import { db } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
+import FloatingInput from "../components/FloatingInput"
+import FloatingSelect from "../components/FloatingSelect"
 import { logActivity } from "../utils/activityLog"
 
 const DAYS = [
@@ -178,28 +180,26 @@ export default function Classes() {
         }
       >
         <form id="class-form" onSubmit={handleSubmit} className="space-y-3">
-          <input
-            placeholder="اسم القسم"
+          <FloatingInput
+            label="اسم القسم"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
-          <input
-            placeholder="المستوى"
+          <FloatingInput
+            label="المستوى"
             value={form.level}
             onChange={(e) => setForm({ ...form, level: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
-          <select
+          <FloatingSelect
+            label="المعلم"
             value={form.teacherId}
             onChange={(e) => setForm({ ...form, teacherId: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           >
-            <option value="">اختر المعلم</option>
+            <option value="" hidden></option>
             {teachers.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
-          </select>
+          </FloatingSelect>
 
           <p className="text-sm text-gray-600 dark:text-gray-300">ايام الحصص</p>
           <div className="flex flex-wrap gap-2">

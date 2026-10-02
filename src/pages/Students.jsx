@@ -5,6 +5,8 @@ import { Search, Pencil, Phone, Upload, Download, X } from "lucide-react"
 import { db } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
+import FloatingInput from "../components/FloatingInput"
+import FloatingSelect from "../components/FloatingSelect"
 import { logActivity } from "../utils/activityLog"
 import { useAuth } from "../context/AuthContext"
 
@@ -491,17 +493,15 @@ export default function Students() {
         }
       >
         <form id="student-form" onSubmit={handleSubmit} className="space-y-3">
-          <input
-            placeholder="الإسم"
+          <FloatingInput
+            label="الإسم"
             value={form.firstName}
             onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
-          <input
-            placeholder="اللقب"
+          <FloatingInput
+            label="اللقب"
             value={form.lastName}
             onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
           <label className="block text-xs text-gray-500 dark:text-gray-400">تاريخ الولادة</label>
           <input
@@ -513,34 +513,31 @@ export default function Students() {
           {form.birthDate && (
             <p className="text-xs text-emerald-700 dark:text-emerald-400">السن: {calculateAge(form.birthDate)} سنة</p>
           )}
-          <input
-            placeholder="اسم الولي"
+          <FloatingInput
+            label="اسم الولي"
             value={form.parentName}
             onChange={(e) => setForm({ ...form, parentName: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
-          <input
-            placeholder="رقم هاتف الولي"
+          <FloatingInput
+            label="رقم هاتف الولي"
             value={form.parentPhone}
             onChange={(e) => setForm({ ...form, parentPhone: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
-          <input
-            placeholder="المستوى القرآني"
+          <FloatingInput
+            label="المستوى القرآني"
             value={form.level}
             onChange={(e) => setForm({ ...form, level: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
-          <select
+          <FloatingSelect
+            label="القسم"
             value={form.classId}
             onChange={(e) => setForm({ ...form, classId: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           >
-            <option value="">اختر القسم</option>
+            <option value="" hidden></option>
             {classes.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
-          </select>
+          </FloatingSelect>
           {form.classId && (
             <p className={`text-xs ${formClassSeats >= CLASS_CAPACITY ? "text-amber-600 dark:text-amber-400" : "text-gray-500 dark:text-gray-400"}`}>
               العدد الحالي: {formClassSeats}/{CLASS_CAPACITY}

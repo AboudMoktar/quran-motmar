@@ -5,6 +5,7 @@ import { Search, Eye, EyeOff, Pencil } from "lucide-react"
 import { db, secondaryAuth, LOGIN_DOMAIN } from "../firebase"
 import FAB from "../components/FAB"
 import BottomSheet from "../components/BottomSheet"
+import FloatingInput from "../components/FloatingInput"
 import { logActivity } from "../utils/activityLog"
 
 const ONLINE_WINDOW_MS = 5 * 60 * 1000
@@ -213,42 +214,38 @@ export default function Teachers() {
 
           {!editingId && (
             <>
-              <input
-                placeholder="اسم المستخدم (تسجيل الدخول)"
+              <FloatingInput
+                label="اسم المستخدم (تسجيل الدخول)"
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
               />
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="كلمة المرور"
-                  value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 pl-10 text-sm dark:bg-gray-700 dark:text-white"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+              <FloatingInput
+                label="كلمة المرور"
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                endAdornment={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="text-gray-400"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                }
+              />
             </>
           )}
 
-          <input
-            placeholder="الاسم الكامل"
+          <FloatingInput
+            label="الاسم الكامل"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
-          <input
-            placeholder="رقم الهاتف"
+          <FloatingInput
+            label="رقم الهاتف"
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
           />
           {error && <p className="text-red-600 dark:text-red-400 text-xs">{error}</p>}
         </form>
