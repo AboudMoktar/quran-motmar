@@ -171,7 +171,7 @@ export function printReceiptsGrid({ monthText, receipts }) {
             <div style="color:#555;">${BRANCH_LABEL}</div>
           </div>
         </div>
-        <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 1px 0; font-size:11.5px;">وصل دفع اشتراك — ${monthText}</p>
+        <p style="text-align:center; font-weight:bold; color:#047857; margin:0 0 1px 0; font-size:11.5px;">وصل دفع اشتراك — ${r.monthText || monthText}</p>
         <p style="text-align:center; font-size:8.5px; color:#888; margin:0 0 3px 0;">رقم الوصل: ${r.receiptNo}${r.isCopy ? ` <span style="color:#b91c1c; font-weight:bold;">— COPIE</span>` : ""}</p>
         ${miniReceiptRow("اسم الطالب", r.studentName)}
         ${miniReceiptRow("القسم", r.className || "-")}
