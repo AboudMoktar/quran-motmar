@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { collection, getDocs, query, where, doc, updateDoc } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, updateDoc, deleteDoc } from "firebase/firestore"
 import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection, printReceipt, printReceiptsGrid } from "../utils/printReport"
@@ -63,6 +63,9 @@ export default function Reports() {
   const [cardPrintLoading, setCardPrintLoading] = useState(false)
   const [cardPrintError, setCardPrintError] = useState("")
   const [cardPrintData, setCardPrintData] = useState(null)
+
+  const [wipeLoading, setWipeLoading] = useState(false)
+  const [wipeResult, setWipeResult] = useState("")
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
@@ -460,6 +463,39 @@ export default function Reports() {
     setCardPrintLoading(false)
   }
 
+  // ---------- One-time reset before real production use: deletes every
+  // "payments" and "receipts" document so the permanent numbering can
+  // genuinely restart at 0001. Driven from inside the app (same
+  // authenticated Firestore connection) rather than Firebase Console's
+  // "Supprimer la collection" on mobile, which only deletes in batches and
+  // can silently leave some documents behind on a slow connection.
+  const handleWipeTestReceipts = async () => {
+    if (
+      !window.confirm(
+        "سيتم حذف كل محتوى 'payments' و 'receipts' نهائياً (كل الأشهر). لا يمكن التراجع. متابعة؟"
+      )
+    )
+      return
+    setWipeLoading(true)
+    setWipeResult("")
+    try {
+      const [paymentsSnap, receiptsSnap] = await Promise.all([
+        getDocs(collection(db, "payments")),
+        getDocs(collection(db, "receipts")),
+      ])
+      await Promise.all([
+        ...paymentsSnap.docs.map((d) => deleteDoc(d.ref)),
+        ...receiptsSnap.docs.map((d) => deleteDoc(d.ref)),
+      ])
+      setWipeResult(`تم حذف ${paymentsSnap.docs.length} دفعة و ${receiptsSnap.docs.length} وصل نهائياً.`)
+      setReceipts(null)
+      setCardPrintData(null)
+    } catch (err) {
+      setWipeResult(`خطأ أثناء الحذف: ${err?.code || err?.message || "غير معروف"}`)
+    }
+    setWipeLoading(false)
+  }
+
   return (
     <div>
       <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">التقارير</h2>
@@ -725,6 +761,21 @@ export default function Reports() {
             )}
           </div>
         )}
+
+        <div className="border-t border-dashed border-red-300 dark:border-red-800 pt-3 mt-1">
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+            إعادة ضبط لمرة واحدة قبل البدء الفعلي: حذف نهائي لكل الدفوعات والوصولات في كامل التطبيق (كل الأشهر)،
+            لإعادة الترقيم من 0001 بشكل مضمون 100٪. لا تستعمله بعد تسجيل دفوعات حقيقية.
+          </p>
+          {wipeResult && <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-2">{wipeResult}</p>}
+          <button
+            onClick={handleWipeTestReceipts}
+            disabled={wipeLoading}
+            className="w-full border border-red-400 text-red-700 dark:text-red-400 dark:border-red-700 rounded-lg py-2 text-xs font-bold disabled:opacity-60"
+          >
+            {wipeLoading ? "جارٍ الحذف..." : "🗑️ حذف نهائي لكل الدفوعات والوصولات"}
+          </button>
+        </div>
       </div>
     </div>
   )
