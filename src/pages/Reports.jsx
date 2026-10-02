@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react"
-import { collection, getDocs, query, where, doc, updateDoc, deleteDoc } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, updateDoc } from "firebase/firestore"
 import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection, printReceipt, printReceiptsGrid } from "../utils/printReport"
 import { surahName, progressPercent } from "../utils/quran"
 import { classTimeLabel } from "./Classes"
 import { calculateAge } from "./Students"
-import { MONTHS, MONTH_LABELS, monthLabel } from "../utils/finance"
-import { getMonthlyFee } from "./Settings"
-import { getOrCreateReceipt, registerReceiptPrint, resetUnpaidReceiptsForMonth } from "../utils/receiptCounter"
+import { monthLabel } from "../utils/finance"
+import { registerReceiptPrint } from "../utils/receiptCounter"
+
+// Pulls the leading integer out of a receipt number like "0007/26" so the
+// registry can be sorted by its REAL numeric value (1, 2, 3, ..., 10, 11)
+// instead of as a string (where "10" would sort before "2").
+function receiptSeq(receiptNo) {
+  const match = /^(\d+)/.exec(receiptNo || "")
+  return match ? Number(match[1]) : 0
+}
 
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
@@ -53,16 +60,9 @@ export default function Reports() {
   const [receipts, setReceipts] = useState(null)
   const [reprintingId, setReprintingId] = useState("")
 
-  const [batchClassId, setBatchClassId] = useState("all")
-  const [batchMonth, setBatchMonth] = useState(MONTHS[new Date().getMonth()])
-  const [batchYear, setBatchYear] = useState(String(new Date().getFullYear()))
-  const [batchLoading, setBatchLoading] = useState(false)
-  const [batchError, setBatchError] = useState("")
-  const [batchResult, setBatchResult] = useState(null)
-  const [batchProgress, setBatchProgress] = useState(null)
-  const [batchPrintData, setBatchPrintData] = useState(null)
-  const [wipeLoading, setWipeLoading] = useState(false)
-  const [wipeResult, setWipeResult] = useState("")
+  const [cardPrintLoading, setCardPrintLoading] = useState(false)
+  const [cardPrintError, setCardPrintError] = useState("")
+  const [cardPrintData, setCardPrintData] = useState(null)
 
   useEffect(() => {
     getDocs(collection(db, "classes")).then((snap) =>
@@ -344,7 +344,10 @@ export default function Reports() {
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter((p) => p.paidDate >= receiptsFrom && p.paidDate <= receiptsTo)
         .filter((p) => receiptsClassId === "all" || p.classId === receiptsClassId)
-        .sort((a, b) => (a.paidDate < b.paidDate ? 1 : a.paidDate > b.paidDate ? -1 : a.receiptNo < b.receiptNo ? 1 : -1))
+        // Sorted by the receipt's REAL numeric sequence (1, 2, 3, ... 10, 11),
+        // never by date or by string comparison — the order a receipt was
+        // assigned is the order it should always be reviewed/printed in.
+        .sort((a, b) => receiptSeq(a.receiptNo) - receiptSeq(b.receiptNo))
       setReceipts(list)
       if (list.length === 0) setReceiptsError("لا توجد وصولات دفع في هذه الفترة")
       return list
@@ -410,148 +413,51 @@ export default function Reports() {
     setReprintingId("")
   }
 
-  // ---------- One-time dev cleanup: wipes ALL test receipts/payments so the
-  // sequence can genuinely restart at 0001. Driven from inside the app
-  // (same authenticated Firestore connection) instead of the Firebase
-  // console's "Supprimer la collection" on mobile, which only deletes
-  // documents in batches and can silently leave some behind on a slow
-  // connection — which is exactly what caused numbers to resume at 0016
-  // instead of 0001 after an apparently-complete console deletion.
-  const handleWipeTestReceipts = async () => {
-    if (
-      !window.confirm(
-        "سيتم حذف كل محتوى 'payments' و 'receipts' نهائياً (بيانات تجريبية فقط). لا يمكن التراجع. متابعة؟"
-      )
-    )
-      return
-    setWipeLoading(true)
-    setWipeResult("")
+  // ---------- Printable receipt cards (the actual signed/stamped 8-per-page
+  // cards) for the payments currently loaded above. Unlike the old monthly
+  // batch, this NEVER creates a receipt for a student who hasn't paid — it
+  // only prints cards for real "payments" documents already in the filtered
+  // list, each with its existing permanent number. Printing bumps the
+  // print count (via registerReceiptPrint, same as a single reprint) so a
+  // second pass over the same payments is clearly marked "COPIE".
+  const handlePrepareReceiptCards = async () => {
+    const list = receipts ?? (await loadReceipts())
+    if (list.length === 0) return
+    setCardPrintLoading(true)
+    setCardPrintError("")
+    setCardPrintData(null)
     try {
-      const [paymentsSnap, receiptsSnap] = await Promise.all([
-        getDocs(collection(db, "payments")),
-        getDocs(collection(db, "receipts")),
-      ])
-      await Promise.all([
-        ...paymentsSnap.docs.map((d) => deleteDoc(d.ref)),
-        ...receiptsSnap.docs.map((d) => deleteDoc(d.ref)),
-      ])
-      setWipeResult(`تم حذف ${paymentsSnap.docs.length} دفعة و ${receiptsSnap.docs.length} وصل نهائياً.`)
-      setReceipts(null)
-      setBatchResult(null)
-      setBatchPrintData(null)
-    } catch (err) {
-      setWipeResult(`خطأ أثناء الحذف: ${err?.code || err?.message || "غير معروف"}`)
-    }
-    setWipeLoading(false)
-  }
-
-  // ---------- Monthly pre-issued receipts, ready to hand out on the 1st of
-  // the month (before most students have actually paid). These go through
-  // the exact same getOrCreateReceipt()/"receipts" collection as a real
-  // payment recorded in الدفوعات — so a student who gets a pre-issued
-  // receipt here and then pays normally keeps the SAME number, and a
-  // student who already paid before this batch runs keeps THEIR number
-  // too. Re-running this for the same month never burns new numbers for
-  // students who already have one; it only prints them again (and marks
-  // them "COPIE" since registerReceiptPrint bumps their print count).
-  //
-  // forceRegenerate=true first deletes any reserved-but-never-actually-paid
-  // numbers for this month (receipts with no matching real payment), so
-  // they get fresh, cleanly ordered numbers. A receipt already tied to a
-  // real payment is never touched or renumbered.
-  const handleIssueMonthlyReceipts = async (forceRegenerate = false) => {
-    setBatchLoading(true)
-    setBatchError("")
-    setBatchResult(null)
-    setBatchProgress(null)
-    setBatchPrintData(null)
-    try {
-      const monthKey = `${batchYear}-${batchMonth}`
-      const targetStudents = students.filter(
-        (s) => s.active !== false && !s.waitlisted && (batchClassId === "all" || s.classId === batchClassId)
-      )
-      if (targetStudents.length === 0) {
-        setBatchError("لا يوجد طلاب نشطون لهذا الاختيار")
-        setBatchLoading(false)
-        return
-      }
-
-      if (forceRegenerate) {
-        await resetUnpaidReceiptsForMonth(batchYear, batchMonth)
-      }
-
-      // Sort students into printing order FIRST (same order they'll appear
-      // on the page: by class, then by name), so any brand-new numbers are
-      // handed out in that same order and increment correctly as you read
-      // the page — not in whatever order Firestore happened to return them.
-      const orderedStudents = [...targetStudents].sort((a, b) => {
-        const clsA = classes.find((c) => c.id === a.classId)?.name || a.className || ""
-        const clsB = classes.find((c) => c.id === b.classId)?.name || b.className || ""
-        const byClass = clsA.localeCompare(clsB, "ar")
-        if (byClass !== 0) return byClass
-        return (a.name || "").localeCompare(b.name || "", "ar")
-      })
-
-      const fee = await getMonthlyFee()
-      const receiptsList = []
-      let newlyIssued = 0
-      let i = 0
-      for (const s of orderedStudents) {
-        i++
-        setBatchProgress({ done: i, total: orderedStudents.length })
-        const cls = classes.find((c) => c.id === s.classId)
-        const className = cls?.name || s.className || ""
-        const { receiptNo, isNew } = await getOrCreateReceipt({
-          studentId: s.id,
-          studentName: s.name,
-          classId: s.classId,
-          className,
-          year: batchYear,
-          month: batchMonth,
-          amount: fee,
-        })
-        if (isNew) newlyIssued++
-        const printCount = await registerReceiptPrint({ studentId: s.id, year: batchYear, month: batchMonth })
-        receiptsList.push({
-          studentId: s.id,
-          studentName: s.name,
-          classId: s.classId,
-          className,
-          receiptNo,
-          amount: fee,
+      const cards = []
+      const printCounts = {}
+      for (const p of list) {
+        const student = students.find((s) => s.id === p.studentId)
+        const cls = classes.find((c) => c.id === p.classId)
+        const [pYear, pMonth] = (p.month || "").split("-")
+        const printCount = await registerReceiptPrint({ studentId: p.studentId, year: pYear, month: pMonth })
+        await updateDoc(doc(db, "payments", p.id), { printCount })
+        printCounts[p.id] = printCount
+        cards.push({
+          studentId: p.studentId,
+          studentName: student?.name || p.studentName || "-",
+          className: cls?.name || p.className || "-",
+          receiptNo: p.receiptNo || "-",
+          amount: p.amount,
+          paidDate: p.paidDate,
+          monthText: p.month ? monthLabel(p.month) : "",
           isCopy: printCount > 1,
         })
       }
-
-      // Dynamic part: look up who has actually paid for this month right now
-      // (even though most of the batch is printed before most people pay),
-      // so a receipt for someone who already paid shows their real payment
-      // date instead of a blank line to fill by hand.
-      const paymentsSnap = await getDocs(query(collection(db, "payments"), where("month", "==", monthKey)))
-      const paidDateByStudent = {}
-      paymentsSnap.docs.forEach((d) => {
-        const p = d.data()
-        const current = paidDateByStudent[p.studentId]
-        if (!current || p.paidDate > current) paidDateByStudent[p.studentId] = p.paidDate
-      })
-      const enrichedReceipts = receiptsList.map((r) => ({
-        ...r,
-        paidDate: paidDateByStudent[r.studentId] || null,
-      }))
-
-      setBatchResult({ total: enrichedReceipts.length, newlyIssued })
-      // Don't call printReceiptsGrid() here directly: on mobile browsers,
-      // window.print() silently does nothing if it fires too long after the
-      // original tap (here, several seconds of Firestore round-trips per
-      // student). Instead, save the data and let the "طباعة الآن" button
-      // below call printReceiptsGrid() directly from ITS OWN tap, which is
-      // immediate and reliably opens the print dialog.
-      setBatchPrintData({ monthText: monthLabel(monthKey), receipts: enrichedReceipts })
+      setReceipts((prev) =>
+        prev ? prev.map((x) => (x.id in printCounts ? { ...x, printCount: printCounts[x.id] } : x)) : prev
+      )
+      // Compute first, print from a SEPARATE immediate tap below: on mobile
+      // browsers window.print() silently does nothing if it fires too long
+      // after the original tap (here, one Firestore round-trip per receipt).
+      setCardPrintData({ receipts: cards })
     } catch (err) {
-      setBatchError(`حدث خطأ أثناء إصدار الوصولات: ${err?.code || err?.message || "غير معروف"}`)
+      setCardPrintError(`تعذّر تجهيز البطاقات: ${err?.code || err?.message || "غير معروف"}`)
     }
-    setBatchProgress(null)
-    setBatchLoading(false)
+    setCardPrintLoading(false)
   }
 
   return (
@@ -714,6 +620,9 @@ export default function Reports() {
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mt-4 space-y-3 border-t-4 border-gold-500">
         <p className="font-medium text-sm text-gray-900 dark:text-gray-100">سجل وصولات الدفع (جاهز للطباعة)</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          يعرض فقط الطلاب الذين دفعوا فعلاً بين التاريخين (حسب تاريخ الدفع الحقيقي)، كل شهر مدفوع بوصله الخاص وبرقمه الدائم. لا يُصدر أي وصل لطالب لم يدفع.
+        </p>
         <select
           value={receiptsClassId}
           onChange={(e) => { setReceiptsClassId(e.target.value); setReceipts(null); setReceiptsError("") }}
@@ -764,11 +673,11 @@ export default function Reports() {
         </div>
 
         {receipts && receipts.length > 0 && (
-          <div className="pt-2 space-y-1">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {receipts.length} وصل — المجموع: {receiptsTotal(receipts)} د.ت
+          <div className="pt-2 space-y-2">
+            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              {receipts.length} وصل محدد — المجموع: {receiptsTotal(receipts)} د.ت
             </p>
-            <div className="max-h-72 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-100 dark:divide-gray-700">
+            <div className="max-h-80 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-100 dark:divide-gray-700">
               {receipts.map((p) => {
                 const student = students.find((s) => s.id === p.studentId)
                 const cls = classes.find((c) => c.id === p.classId)
@@ -777,16 +686,14 @@ export default function Reports() {
                   <div key={p.id} className="flex items-center justify-between gap-2 px-3 py-2">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-gray-900 dark:text-gray-100 truncate">
-                        {student?.name || "-"} — {p.amount} د.ت
+                        رقم {p.receiptNo || "-"} — {student?.name || p.studentName || "-"}
                       </p>
                       <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                        {p.receiptNo || "-"} — {p.paidDate} — {cls?.name || "-"}
+                        {cls?.name || p.className || "-"} — شهر {p.month ? monthLabel(p.month) : "-"} — دُفع في {p.paidDate} — {p.amount} د.ت
                       </p>
-                      {isDuplicate && (
-                        <p className="text-[11px] text-red-600 dark:text-red-400">
-                          ⚠️ طُبع {p.printCount} مرات
-                        </p>
-                      )}
+                      <p className={`text-[11px] font-medium ${isDuplicate ? "text-red-600 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+                        {isDuplicate ? `نسخة — طُبع ${p.printCount} مرات` : "أصلي"}
+                      </p>
                     </div>
                     <button
                       onClick={() => handleReprint(p)}
@@ -799,99 +706,25 @@ export default function Reports() {
                 )
               })}
             </div>
+
+            {cardPrintError && <p className="text-red-600 dark:text-red-400 text-xs">{cardPrintError}</p>}
+            <button
+              onClick={handlePrepareReceiptCards}
+              disabled={cardPrintLoading}
+              className="w-full bg-emerald-800 text-white rounded-lg py-2 text-sm disabled:opacity-60"
+            >
+              {cardPrintLoading ? "جارٍ التجهيز..." : `تجهيز بطاقات الوصولات للطباعة (${receipts.length})`}
+            </button>
+            {cardPrintData && (
+              <button
+                onClick={() => printReceiptsGrid(cardPrintData)}
+                className="w-full bg-blue-700 text-white rounded-lg py-2 text-sm font-bold"
+              >
+                🖨️ طباعة الآن ({cardPrintData.receipts.length} وصل)
+              </button>
+            )}
           </div>
         )}
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mt-4 space-y-3 border-t-4 border-gold-500">
-        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">إصدار وصولات الشهر مسبقاً (8 بالصفحة)</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          بنقرة واحدة: يُصدر وصل لكل طالب نشط لهذا الشهر برقم رسمي، ويُطبع 8 وصولات في كل صفحة A4 — حتى قبل أن يدفع معظم الطلاب، لتُملأ يدوياً (التاريخ والإمضاء) عند الدفع الفعلي.
-        </p>
-        <select
-          value={batchClassId}
-          onChange={(e) => setBatchClassId(e.target.value)}
-          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
-        >
-          <option value="all">كل الأقسام</option>
-          {classes.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-        <div className="flex gap-2">
-          <select
-            value={batchMonth}
-            onChange={(e) => setBatchMonth(e.target.value)}
-            className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
-          >
-            {MONTHS.map((m) => (
-              <option key={m} value={m}>{MONTH_LABELS[m]}</option>
-            ))}
-          </select>
-          <input
-            type="number"
-            value={batchYear}
-            onChange={(e) => setBatchYear(e.target.value)}
-            className="w-24 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-        {batchError && <p className="text-red-600 dark:text-red-400 text-xs">{batchError}</p>}
-        {batchProgress && (
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            جارٍ المعالجة: {batchProgress.done} / {batchProgress.total}
-          </p>
-        )}
-        {batchResult && (
-          <p className="text-xs text-emerald-700 dark:text-emerald-400">
-            {batchResult.total} وصل جاهز للطباعة ({batchResult.newlyIssued} وصل جديد
-            {batchResult.total > batchResult.newlyIssued ? ` — ${batchResult.total - batchResult.newlyIssued} صدر مسبقاً وأُعيدت طباعته بنفس الرقم` : ""})
-          </p>
-        )}
-        <button
-          onClick={() => handleIssueMonthlyReceipts(false)}
-          disabled={batchLoading}
-          className="w-full bg-emerald-800 text-white rounded-lg py-2 text-sm disabled:opacity-60"
-        >
-          {batchLoading ? `جارٍ الإصدار... ${batchProgress ? `(${batchProgress.done}/${batchProgress.total})` : ""}` : "إصدار وتجهيز وصولات الشهر"}
-        </button>
-        {batchPrintData && (
-          <button
-            onClick={() => printReceiptsGrid(batchPrintData)}
-            className="w-full bg-blue-700 text-white rounded-lg py-2 text-sm font-bold"
-          >
-            🖨️ طباعة الآن ({batchPrintData.receipts.length} وصل)
-          </button>
-        )}
-        <button
-          onClick={() => {
-            if (
-              window.confirm(
-                "سيتم حذف الأرقام المحجوزة غير المدفوعة فعلياً لهذا الشهر فقط وإعادة إصدارها مرتبة. أرقام أي طالب دفع فعلاً لن تتغيّر. متابعة؟"
-              )
-            ) {
-              handleIssueMonthlyReceipts(true)
-            }
-          }}
-          disabled={batchLoading}
-          className="w-full border border-red-300 text-red-700 dark:text-red-400 dark:border-red-700 rounded-lg py-2 text-xs disabled:opacity-60"
-        >
-          إعادة ترقيم وإصدار من جديد لهذا الشهر (لحذف الترقيم القديم غير المرتّب)
-        </button>
-
-        <div className="border-t border-dashed border-red-300 dark:border-red-800 pt-3 mt-1">
-          <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
-            للتجربة فقط: حذف نهائي لكل الدفوعات والوصولات في كامل التطبيق (كل الأشهر)، لإعادة الترقيم من 0001
-            بشكل مضمون 100٪. استعمله فقط قبل البدء الفعلي بالتطبيق.
-          </p>
-          {wipeResult && <p className="text-xs text-emerald-700 dark:text-emerald-400 mb-2">{wipeResult}</p>}
-          <button
-            onClick={handleWipeTestReceipts}
-            disabled={wipeLoading}
-            className="w-full border border-red-400 text-red-700 dark:text-red-400 dark:border-red-700 rounded-lg py-2 text-xs font-bold disabled:opacity-60"
-          >
-            {wipeLoading ? "جارٍ الحذف..." : "🗑️ حذف نهائي لكل الدفوعات والوصولات (تجريبي)"}
-          </button>
-        </div>
       </div>
     </div>
   )
