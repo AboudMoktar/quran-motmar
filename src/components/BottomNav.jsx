@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { LayoutDashboard, Users, CalendarCheck, BookOpen, MoreHorizontal } from "lucide-react"
+import { LayoutDashboard, Users, CalendarCheck, BookOpen, ClipboardList, MoreHorizontal } from "lucide-react"
 
 const ADMIN_TABS = [
   { to: "/dashboard", label: "الرئيسية", icon: LayoutDashboard },
@@ -12,6 +12,7 @@ const ADMIN_TABS = [
 const TEACHER_TABS = [
   { to: "/attendance", label: "الحضور", icon: CalendarCheck },
   { to: "/students", label: "الطلاب", icon: Users },
+  { to: "/notebook", label: "كراس القسم", icon: ClipboardList },
   { to: "/progress", label: "التقدم", icon: BookOpen },
   { to: "/payments", label: "الاشتراكات", icon: Users },
 ]
@@ -22,7 +23,7 @@ export default function BottomNav({ isAdminLevel }) {
 
   const isActive = (to) => {
     if (to === "/more") {
-      return ["/teachers", "/reports", "/payments", "/progress", "/more"].includes(location.pathname)
+      return ["/teachers", "/reports", "/payments", "/progress", "/notebook", "/more"].includes(location.pathname)
     }
     return location.pathname === to
   }
