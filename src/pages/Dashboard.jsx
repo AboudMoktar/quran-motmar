@@ -15,6 +15,15 @@ function toLocalISODate(d) {
   return `${y}-${m}-${day}`
 }
 
+// يفتح واتساب (تطبيق الهاتف أو واتساب ويب) مع نص جاهز، بدون رقم هاتف محدد —
+// هذا يجعل واتساب يعرض قائمة المحادثات/المجموعات ليختار المستخدم يدويًا
+// المجموعة المطلوبة (مثل "أطفال القرآن")، فالتطبيق لا يستطيع الإرسال
+// تلقائيًا إلى مجموعة محدّدة بالاسم (لا توجد صلاحية API لذلك)، لكنه يوفّر
+// النص جاهزًا للصق بضغطة واحدة بدل كتابته يدويًا.
+function openWhatsApp(text) {
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank")
+}
+
 const LOW_ATTENDANCE_THRESHOLD = 70
 const MONTH_LABELS = {
   "01": "جانفي", "02": "فيفري", "03": "مارس", "04": "أفريل",
@@ -153,6 +162,22 @@ export default function Dashboard() {
     (c) => classIdsWithAttendanceToday.has(c.id) && !classIdsWithNotebookToday.has(c.id)
   )
 
+  const notebookReminderMessage = () => {
+    const lines = [
+      "السلام عليكم ورحمة الله وبركاته،",
+      "",
+      `تذكير بملء كراس القسم لحصة اليوم (${today}):`,
+      ...classesMissingNotebookToday.map((c) => {
+        const teacher = teachers.find((t) => t.id === c.teacherId)
+        return `- ${c.name} (${c.teacherName || teacher?.name || "-"})`
+      }),
+      "",
+      "برجاء تسجيل الحصة في كراس القسم في أقرب وقت ممكن.",
+      "بارك الله فيكم وجزاكم خيرًا.",
+    ]
+    return lines.join("\n")
+  }
+
   if (loading) {
     return <div className="text-center py-10 text-gray-500 dark:text-gray-400">جارٍ التحميل...</div>
   }
@@ -217,6 +242,15 @@ export default function Dashboard() {
               )
             })}
           </div>
+          <button
+            onClick={() => openWhatsApp(notebookReminderMessage())}
+            className="w-full bg-emerald-600 dark:bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium mt-3"
+          >
+            إرسال تذكير عبر واتساب لمجموعة الأساتذة
+          </button>
+          <p className="text-[11px] text-amber-600 dark:text-amber-300/70 mt-1 text-center">
+            سيفتح واتساب مع نص التذكير جاهزًا — اختر مجموعة "أطفال القرآن" لإرساله
+          </p>
         </div>
       )}
 
