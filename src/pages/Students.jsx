@@ -48,8 +48,7 @@ const CLASS_CAPACITY = 20
 
 // Column header variants accepted in the imported Excel file (matched trimmed/lowercased)
 const COLUMN_ALIASES = {
-  firstName: ["الاسم", "الإسم", "الاسم الأول", "firstname", "first name"],
-  lastName: ["اللقب", "الاسم الأخير", "lastname", "last name"],
+  fullName: ["الاسم الكامل", "الاسم و اللقب", "الاسم واللقب", "الاسم", "الإسم", "fullname", "full name", "name"],
   birthDate: ["تاريخ الولادة", "birthdate", "birth date"],
   parentName: ["اسم الولي", "ولي الأمر", "parent", "parentname"],
   parentPhone: ["هاتف الولي", "رقم هاتف الولي", "رقم الهاتف", "phone", "parentphone"],
@@ -254,8 +253,7 @@ export default function Students() {
   const handleDownloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
       {
-        "الاسم": "محمد",
-        "اللقب": "بن علي",
+        "الاسم الكامل": "محمد بن علي",
         "تاريخ الولادة": "2015-03-12",
         "اسم الولي": "علي بن علي",
         "هاتف الولي": "20123456",
@@ -282,10 +280,10 @@ export default function Students() {
         const sheet = wb.Sheets[wb.SheetNames[0]]
         const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" })
 
-        const existingKey = (firstName, lastName, classId) =>
-          `${firstName.trim().toLowerCase()}|${lastName.trim().toLowerCase()}|${classId}`
+        const existingKey = (name, classId) =>
+          `${name.trim().toLowerCase()}|${classId}`
         const existingSet = new Set(
-          students.map((s) => existingKey(s.firstName || "", s.lastName || "", s.classId || ""))
+          students.map((s) => existingKey(s.name || "", s.classId || ""))
         )
 
         const parsed = []
@@ -294,8 +292,7 @@ export default function Students() {
 
         rawRows.forEach((row, idx) => {
           const rowNum = idx + 2 // +1 for header row, +1 for 1-based
-          const firstName = String(findValue(row, "firstName") || "").trim()
-          const lastName = String(findValue(row, "lastName") || "").trim()
+          const fullName = String(findValue(row, "fullName") || "").trim().replace(/\s+/g, " ")
           const birthDateRaw = findValue(row, "birthDate")
           const birthDate = toDateString(birthDateRaw)
           const parentName = String(findValue(row, "parentName") || "").trim()
@@ -306,10 +303,10 @@ export default function Students() {
           const enrollDate = toDateString(enrollDateRaw) || toLocalISODate(new Date())
           const active = toActiveBool(findValue(row, "active"))
 
-          if (!firstName && !lastName && !classNameRaw) return // skip fully empty row
+          if (!fullName && !classNameRaw) return // skip fully empty row
 
-          if (!firstName || !lastName) {
-            errors.push(`السطر ${rowNum}: الاسم واللقب مطلوبان`)
+          if (!fullName) {
+            errors.push(`السطر ${rowNum}: اسم الطالب مطلوب`)
             return
           }
           if (!birthDate) {
@@ -324,17 +321,18 @@ export default function Students() {
             return
           }
 
-          const key = existingKey(firstName, lastName, cls.id)
+          const key = existingKey(fullName, cls.id)
           if (existingSet.has(key) || seenInFile.has(key)) {
-            errors.push(`السطر ${rowNum}: "${firstName} ${lastName}" موجود مسبقاً في قسم "${cls.name}" — تم تجاهله`)
+            errors.push(`السطر ${rowNum}: "${fullName}" موجود مسبقاً في قسم "${cls.name}" — تم تجاهله`)
             return
           }
           seenInFile.add(key)
 
+          const { firstName, lastName } = splitFullName(fullName)
           parsed.push({
             firstName,
             lastName,
-            name: `${firstName} ${lastName}`,
+            name: fullName,
             birthDate,
             parentName,
             parentPhone,
@@ -602,7 +600,7 @@ export default function Students() {
           {!importResult && (
             <>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                الأعمدة المطلوبة: الاسم، اللقب، تاريخ الولادة، القسم (يجب أن يطابق اسم قسم موجود في التطبيق).
+                الأعمدة المطلوبة: الاسم الكامل، تاريخ الولادة، القسم (يجب أن يطابق اسم قسم موجود في التطبيق).
                 يمكن أيضاً إضافة: اسم الولي، هاتف الولي، مقدار الحفظ، تاريخ التسجيل، نشط.
               </p>
               <button
