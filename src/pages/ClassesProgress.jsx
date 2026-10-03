@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
 import { collection, onSnapshot } from "firebase/firestore"
-import { ChevronDown, ChevronUp, MessageCircle } from "lucide-react"
+import { ChevronDown, ChevronUp } from "lucide-react"
 import { db } from "../firebase"
 import { SURAHS } from "../utils/quran"
-import { getSessionsForClass, buildReviewMessage } from "../utils/classNotebook"
+import { getSessionsForClass } from "../utils/classNotebook"
 
 // نفس دوال التنسيق المستعملة في ClassNotebook.jsx (عرض فقط، بدون أي تعديل
 // على المنطق أو البيانات) — مكررة هنا محليًا بدل استيرادها من صفحة أخرى،
@@ -32,12 +32,6 @@ export default function ClassesProgress() {
   const [loading, setLoading] = useState(false)
   const [openDates, setOpenDates] = useState({})
 
-  // توليد رسالة "المطلوب مراجعته" لحصة واحدة (المرحلة 7) — نفس آلية
-  // ClassNotebook.jsx، متاحة هنا أيضًا للإدارة.
-  const [messageDate, setMessageDate] = useState(null)
-  const [messageText, setMessageText] = useState("")
-  const [messageCopied, setMessageCopied] = useState(false)
-
   // الإدارة ترى كل الأقسام (بدون تصفية حسب الأستاذ)، بنفس طريقة
   // Classes.jsx.
   useEffect(() => {
@@ -54,7 +48,6 @@ export default function ClassesProgress() {
     }
     setLoading(true)
     setOpenDates({})
-    setMessageDate(null)
     getSessionsForClass(classId).then((list) => {
       setSessions(list)
       setLoading(false)
@@ -62,23 +55,6 @@ export default function ClassesProgress() {
   }, [classId])
 
   const toggleDate = (d) => setOpenDates((prev) => ({ ...prev, [d]: !prev[d] }))
-
-  const openReviewMessage = (session) => {
-    if (messageDate === session.date) {
-      setMessageDate(null)
-      return
-    }
-    setMessageDate(session.date)
-    setMessageText(buildReviewMessage(session))
-    setMessageCopied(false)
-  }
-
-  const copyReviewMessage = () => {
-    navigator.clipboard.writeText(messageText).then(() => {
-      setMessageCopied(true)
-      setTimeout(() => setMessageCopied(false), 2500)
-    })
-  }
 
   const selectedClass = classes.find((c) => c.id === classId)
   const lastSession = sessions[0] || null
@@ -169,42 +145,6 @@ export default function ClassesProgress() {
                       <div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">📝 ملاحظة:</p>
                         <p className="text-xs text-gray-700 dark:text-gray-300">{session.notes}</p>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => openReviewMessage(session)}
-                      className="w-full flex items-center justify-center gap-1 border border-gray-300 dark:border-gray-600 rounded-lg py-1.5 text-xs text-gray-700 dark:text-gray-300"
-                    >
-                      <MessageCircle size={14} /> 📱 إنشاء رسالة للأولياء
-                    </button>
-
-                    {messageDate === session.date && (
-                      <div className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">نص الرسالة (قابل للتعديل)</p>
-                          <button
-                            onClick={() => setMessageText(buildReviewMessage(session))}
-                            className="text-xs text-emerald-700 dark:text-emerald-400"
-                          >
-                            استعادة النص الافتراضي
-                          </button>
-                        </div>
-                        <textarea
-                          value={messageText}
-                          onChange={(e) => setMessageText(e.target.value)}
-                          rows={6}
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs dark:bg-gray-700 dark:text-white"
-                        />
-                        <button
-                          onClick={copyReviewMessage}
-                          className="w-full bg-gray-700 text-white rounded-lg py-2 text-xs"
-                        >
-                          {messageCopied ? "تم النسخ ✓" : "نسخ النص"}
-                        </button>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
-                          لإرسال الرسالة لأولياء قسم كامل مع اختيار الطلبة، استعمل "الرسائل" من القائمة
-                        </p>
                       </div>
                     )}
                   </div>
