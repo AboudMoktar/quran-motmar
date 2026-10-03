@@ -63,7 +63,7 @@ function AppContent() {
         <Route path="/notebook" element={<ClassNotebook />} />
         <Route path="/classes-progress" element={<AdminRoute><ClassesProgress /></AdminRoute>} />
         <Route path="/teachers-tracking" element={<AdminRoute><TeachersTracking /></AdminRoute>} />
-        <Route path="/pedagogical-dashboard" element={<AdminRoute><PedagogicalDashboard /></AdminRoute>} />
+        <Route path="/pedagogical-dashboard" element={<PedagogicalDashboard />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>
