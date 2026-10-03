@@ -11,6 +11,7 @@ import Attendance from "./pages/Attendance"
 import Payments from "./pages/Payments"
 import Finance from "./pages/Finance"
 import Progress from "./pages/Progress"
+import ClassNotebook from "./pages/ClassNotebook"
 import Reports from "./pages/Reports"
 import Messages from "./pages/Messages"
 import Settings from "./pages/Settings"
@@ -56,6 +57,7 @@ function AppContent() {
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/payments" element={<Payments />} />
         <Route path="/progress" element={<Progress />} />
+        <Route path="/notebook" element={<ClassNotebook />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>
