@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom"
-import { Users, FileBarChart, Wallet, TrendingUp, BookMarked, MessageCircle, Settings as SettingsIcon, History, Trash2, ChevronLeft } from "lucide-react"
+import { Users, FileBarChart, Wallet, TrendingUp, BookMarked, ClipboardList, MessageCircle, Settings as SettingsIcon, History, Trash2, ChevronLeft } from "lucide-react"
 
 const ITEMS = [
   { to: "/teachers", label: "الفريق", icon: Users },
+  { to: "/notebook", label: "كراس القسم", icon: ClipboardList },
   { to: "/progress", label: "التقدم القرآني", icon: BookMarked },
   { to: "/reports", label: "التقارير", icon: FileBarChart },
   { to: "/payments", label: "الاشتراكات", icon: Wallet },
