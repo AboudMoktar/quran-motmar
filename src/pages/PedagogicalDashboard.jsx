@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { collection, onSnapshot, query, where } from "firebase/firestore"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Search, X } from "lucide-react"
 import { db } from "../firebase"
 import { SURAHS } from "../utils/quran"
 import { getAllSessions } from "../utils/classNotebook"
@@ -39,6 +39,14 @@ export default function PedagogicalDashboard() {
   const [sessions, setSessions] = useState([])
   const [loadingSessions, setLoadingSessions] = useState(true)
 
+  // فلاتر البحث والتصفية — كل الفلاتر اختيارية وتُطبَّق محليًا على الحصص
+  // المحمّلة مسبقًا (sessions)، بدون أي قراءة إضافية من Firestore.
+  const [filterClassId, setFilterClassId] = useState("")
+  const [filterTeacherId, setFilterTeacherId] = useState("")
+  const [filterSurah, setFilterSurah] = useState("")
+  const [filterFrom, setFilterFrom] = useState("")
+  const [filterTo, setFilterTo] = useState("")
+
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "classes"), (snap) => {
       setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !c.deletedAt))
@@ -68,6 +76,28 @@ export default function PedagogicalDashboard() {
 
   const recentSessions = sessions.slice(0, 8)
 
+  const hasActiveFilters =
+    filterClassId || filterTeacherId || filterSurah || filterFrom || filterTo
+
+  const resetFilters = () => {
+    setFilterClassId("")
+    setFilterTeacherId("")
+    setFilterSurah("")
+    setFilterFrom("")
+    setFilterTo("")
+  }
+
+  const filteredSessions = hasActiveFilters
+    ? sessions.filter((s) => {
+        if (filterClassId && s.classId !== filterClassId) return false
+        if (filterTeacherId && s.teacherId !== filterTeacherId) return false
+        if (filterSurah && !(s.lessons || []).some((l) => String(l.surah) === String(filterSurah))) return false
+        if (filterFrom && s.date < filterFrom) return false
+        if (filterTo && s.date > filterTo) return false
+        return true
+      })
+    : []
+
   return (
     <div>
       <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">📊 المتابعة البيداغوجية</h2>
@@ -78,6 +108,106 @@ export default function PedagogicalDashboard() {
 
       {!loadingSessions && (
         <div className="space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                <Search size={16} className="text-emerald-700 dark:text-emerald-400" />
+                البحث والتصفية
+              </p>
+              {hasActiveFilters && (
+                <button
+                  onClick={resetFilters}
+                  className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"
+                >
+                  <X size={14} />
+                  مسح الفلاتر
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={filterClassId}
+                onChange={(e) => setFilterClassId(e.target.value)}
+                className="border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-xs dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">كل الأقسام</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={filterTeacherId}
+                onChange={(e) => setFilterTeacherId(e.target.value)}
+                className="border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-xs dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">كل الأساتذة</option>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={filterSurah}
+                onChange={(e) => setFilterSurah(e.target.value)}
+                className="col-span-2 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-xs dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">كل السور</option>
+                {SURAHS.map((s) => (
+                  <option key={s.number} value={s.number}>{s.name}</option>
+                ))}
+              </select>
+
+              <div>
+                <label className="block text-[11px] text-gray-500 dark:text-gray-400 mb-1">من تاريخ</label>
+                <input
+                  type="date"
+                  value={filterFrom}
+                  onChange={(e) => setFilterFrom(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-xs dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-gray-500 dark:text-gray-400 mb-1">إلى تاريخ</label>
+                <input
+                  type="date"
+                  value={filterTo}
+                  onChange={(e) => setFilterTo(e.target.value)}
+                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-xs dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  عدد النتائج: {filteredSessions.length}
+                </p>
+                <div className="space-y-2">
+                  {filteredSessions.map((s) => (
+                    <button
+                      key={`filtered_${s.classId}_${s.date}`}
+                      onClick={() => navigate(`/classes-progress?classId=${s.classId}`)}
+                      className="w-full bg-gray-50 dark:bg-gray-700 rounded-lg p-3 flex items-center justify-between text-right"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">📅 {friendlyDate(s.date)} — {s.className}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">👨‍🏫 {s.teacherName || "-"} — 📖 {lastLessonsLabel(s.lessons)}</p>
+                      </div>
+                      <ChevronLeft size={18} className="text-gray-400 shrink-0" />
+                    </button>
+                  ))}
+                  {filteredSessions.length === 0 && (
+                    <p className="text-gray-400 dark:text-gray-500 text-xs text-center py-4">
+                      لا توجد حصص مطابقة لهذا البحث
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">الأقسام</p>
