@@ -14,6 +14,7 @@ import Progress from "./pages/Progress"
 import ClassNotebook from "./pages/ClassNotebook"
 import ClassesProgress from "./pages/ClassesProgress"
 import TeachersTracking from "./pages/TeachersTracking"
+import PedagogicalDashboard from "./pages/PedagogicalDashboard"
 import Reports from "./pages/Reports"
 import Messages from "./pages/Messages"
 import Settings from "./pages/Settings"
@@ -62,6 +63,7 @@ function AppContent() {
         <Route path="/notebook" element={<ClassNotebook />} />
         <Route path="/classes-progress" element={<AdminRoute><ClassesProgress /></AdminRoute>} />
         <Route path="/teachers-tracking" element={<AdminRoute><TeachersTracking /></AdminRoute>} />
+        <Route path="/pedagogical-dashboard" element={<AdminRoute><PedagogicalDashboard /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>
