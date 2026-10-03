@@ -54,7 +54,7 @@ const COLUMN_ALIASES = {
   birthDate: ["تاريخ الولادة", "birthdate", "birth date"],
   parentName: ["اسم الولي", "ولي الأمر", "parent", "parentname"],
   parentPhone: ["هاتف الولي", "رقم هاتف الولي", "رقم الهاتف", "phone", "parentphone"],
-  level: ["المستوى", "المستوى القرآني", "level"],
+  level: ["المستوى", "المستوى القرآني", "مقدار الحفظ", "level"],
   className: ["القسم", "الفصل", "class", "classname"],
   enrollDate: ["تاريخ التسجيل", "enrolldate", "enroll date"],
   active: ["نشط", "الحالة", "active", "status"],
@@ -248,7 +248,7 @@ export default function Students() {
         "تاريخ الولادة": "2015-03-12",
         "اسم الولي": "علي بن علي",
         "هاتف الولي": "20123456",
-        "المستوى": "جزء عمّ",
+        "مقدار الحفظ": "جزء عمّ",
         "القسم": classes[0]?.name || "اسم القسم كما هو مسجل في التطبيق",
         "تاريخ التسجيل": toLocalISODate(new Date()),
         "نشط": "نعم",
@@ -524,7 +524,7 @@ export default function Students() {
             onChange={(e) => setForm({ ...form, parentPhone: e.target.value })}
           />
           <FloatingInput
-            label="المستوى القرآني"
+            label="مقدار الحفظ"
             value={form.level}
             onChange={(e) => setForm({ ...form, level: e.target.value })}
           />
@@ -597,7 +597,7 @@ export default function Students() {
             <>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 الأعمدة المطلوبة: الاسم، اللقب، تاريخ الولادة، القسم (يجب أن يطابق اسم قسم موجود في التطبيق).
-                يمكن أيضاً إضافة: اسم الولي، هاتف الولي، المستوى، تاريخ التسجيل، نشط.
+                يمكن أيضاً إضافة: اسم الولي، هاتف الولي، مقدار الحفظ، تاريخ التسجيل، نشط.
               </p>
               <button
                 onClick={handleDownloadTemplate}

@@ -93,7 +93,7 @@ export default function Reports() {
       "الاسم": s.name,
       "السن": calculateAge(s.birthDate) ?? "-",
       "هاتف ولي الأمر": s.parentPhone,
-      "المستوى": s.level,
+      "مقدار الحفظ": s.level,
       "القسم": s.className,
       "تاريخ التسجيل": s.enrollDate,
     }))
@@ -112,7 +112,7 @@ export default function Reports() {
           "الاسم": s.name,
           "السن": calculateAge(s.birthDate) ?? "-",
           "هاتف ولي الأمر": s.parentPhone,
-          "المستوى": s.level,
+          "مقدار الحفظ": s.level,
           "تاريخ التسجيل": s.enrollDate,
         })),
     }))
