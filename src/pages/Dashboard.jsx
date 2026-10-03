@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [students, setStudents] = useState([])
   const [teachers, setTeachers] = useState([])
   const [attendance, setAttendance] = useState([])
+  const [notebookToday, setNotebookToday] = useState([])
   const [payments, setPayments] = useState([])
   const [monthlyFee, setMonthlyFee] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -41,11 +42,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     const load = async () => {
-      const [classesSnap, studentsSnap, teachersSnap, attendanceSnap, paymentsSnap, fee] = await Promise.all([
+      const todayStr = toLocalISODate(new Date())
+      const [classesSnap, studentsSnap, teachersSnap, attendanceSnap, notebookSnap, paymentsSnap, fee] = await Promise.all([
         getDocs(collection(db, "classes")),
         getDocs(collection(db, "students")),
         getDocs(query(collection(db, "users"), where("role", "==", "teacher"))),
         getDocs(collection(db, "attendance")),
+        getDocs(query(collection(db, "classNotebook"), where("date", "==", todayStr))),
         getDocs(query(collection(db, "payments"), where("month", "==", currentMonthKey))),
         getMonthlyFee(),
       ])
@@ -53,6 +56,7 @@ export default function Dashboard() {
       setStudents(studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((s) => !s.deletedAt))
       setTeachers(teachersSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.deletedAt))
       setAttendance(attendanceSnap.docs.map((d) => d.data()))
+      setNotebookToday(notebookSnap.docs.map((d) => d.data()))
       setPayments(paymentsSnap.docs.map((d) => d.data()))
       setMonthlyFee(fee)
       setLoading(false)
@@ -139,6 +143,16 @@ export default function Dashboard() {
 
   const activeStudentsCount = students.filter((s) => s.active !== false).length
 
+  // أقسام أُخذ فيها الحضور اليوم (أي حصة فعلية حصلت) لكن لم يُسجَّل لها بعد
+  // "كراس القسم" لنفس اليوم — تنبيه للإدارة لتذكير الأستاذ المعني بملء الكراس.
+  const classIdsWithAttendanceToday = new Set(
+    attendance.filter((a) => a.date === today && a.classId).map((a) => a.classId)
+  )
+  const classIdsWithNotebookToday = new Set(notebookToday.map((n) => n.classId))
+  const classesMissingNotebookToday = classes.filter(
+    (c) => classIdsWithAttendanceToday.has(c.id) && !classIdsWithNotebookToday.has(c.id)
+  )
+
   if (loading) {
     return <div className="text-center py-10 text-gray-500 dark:text-gray-400">جارٍ التحميل...</div>
   }
@@ -174,6 +188,35 @@ export default function Dashboard() {
           >
             إرسال رسالة تذكير جماعية
           </Link>
+        </div>
+      )}
+
+      {classesMissingNotebookToday.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-xl p-4 mb-4">
+          <p className="font-medium text-sm text-amber-700 dark:text-amber-300 mb-1">
+            تنبيه: كراس القسم لم يُملأ اليوم
+          </p>
+          <p className="text-xs text-amber-600 dark:text-amber-300/80 mb-3">
+            الأقسام التالية سُجّل فيها الحضور اليوم لكن الأستاذ لم يسجّل بعد حصة اليوم في كراس القسم
+          </p>
+          <div className="space-y-2">
+            {classesMissingNotebookToday.map((c) => {
+              const teacher = teachers.find((t) => t.id === c.teacherId)
+              return (
+                <div key={c.id} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{c.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{c.teacherName || teacher?.name || "-"}</p>
+                  </div>
+                  {teacher?.phone && (
+                    <a href={`tel:${teacher.phone}`} className="text-sm text-amber-700 dark:text-amber-400 font-medium" dir="ltr">
+                      {teacher.phone}
+                    </a>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
