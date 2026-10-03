@@ -3,13 +3,12 @@ import { collection, onSnapshot, query, where } from "firebase/firestore"
 import { Pencil, Trash2, ChevronDown, ChevronUp, X } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
-import { SURAHS } from "../utils/quran"
+import { SURAHS, surahName } from "../utils/quran"
 import {
   getSessionsForClass,
   saveSession,
   deleteSession,
   newLessonId,
-  formatLesson,
 } from "../utils/classNotebook"
 import { logActivity } from "../utils/activityLog"
 import FAB from "../components/FAB"
@@ -22,6 +21,31 @@ function toLocalISODate(d) {
   const m = String(d.getMonth() + 1).padStart(2, "0")
   const day = String(d.getDate()).padStart(2, "0")
   return `${y}-${m}-${day}`
+}
+
+const DAYS_LABELS = {
+  sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
+  thu: "الخميس", fri: "الجمعة", sat: "السبت"
+}
+const DAY_KEYS_BY_INDEX = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+
+// "السبت 03/10/2026" بدل "2026-10-03" فقط — نفس أسلوب العرض المستعمل في
+// Messages.jsx، لعرض أوضح على الهاتف (مجرد تنسيق، لا يغيّر التاريخ المحفوظ).
+function friendlyDate(dateStr) {
+  if (!dateStr) return ""
+  const [y, m, d] = dateStr.split("-")
+  const dayName = DAYS_LABELS[DAY_KEYS_BY_INDEX[new Date(`${dateStr}T00:00:00`).getDay()]]
+  return `${dayName} ${d}/${m}/${y}`
+}
+
+// نص مختصر لسطر واحد عند طي الحصة، مثل: "📖 3 دروس: النبأ، النازعات، عبس" —
+// فقط لتسهيل التصفح السريع دون الحاجة لفتح كل حصة؛ التفاصيل الكاملة (من/إلى
+// آية) تبقى داخل القائمة المفصّلة عند الفتح.
+function lessonsSummary(lessons) {
+  const list = lessons || []
+  if (list.length === 0) return "لا توجد دروس"
+  const names = list.map((l) => surahName(l.surah)).join("، ")
+  return `📖 ${list.length} ${list.length === 1 ? "درس" : "دروس"}: ${names}`
 }
 
 const emptyLessonRow = () => ({ id: newLessonId(), surah: "", fromAyah: "", toAyah: "" })
@@ -173,7 +197,9 @@ export default function ClassNotebook() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">📚 كراس القسم</h2>
+      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
+        📚 {selectedClass ? `كراس قسم ${selectedClass.name}` : "كراس القسم"}
+      </h2>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
         <select
@@ -206,8 +232,11 @@ export default function ClassNotebook() {
                 className="w-full flex items-center justify-between"
               >
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">📅 {session.date}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">👨‍🏫 {session.teacherName || "-"}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">📅 {friendlyDate(session.date)}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">👨‍🏫 الأستاذ: {session.teacherName || "-"}</p>
+                  {!openDates[session.date] && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{lessonsSummary(session.lessons)}</p>
+                  )}
                 </div>
                 {openDates[session.date] ? (
                   <ChevronUp size={18} className="text-gray-400" />
@@ -222,7 +251,9 @@ export default function ClassNotebook() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">📖 الدروس:</p>
                     <div className="space-y-1">
                       {(session.lessons || []).map((l) => (
-                        <p key={l.id} className="text-xs text-gray-700 dark:text-gray-300">• {formatLesson(l)}</p>
+                        <p key={l.id} className="text-xs text-gray-700 dark:text-gray-300">
+                          • سورة {surahName(l.surah)} — {l.fromAyah} → {l.toAyah}
+                        </p>
                       ))}
                     </div>
                   </div>
