@@ -34,7 +34,8 @@ export function calculateAge(birthDate) {
 }
 
 const emptyForm = {
-  fullName: "",
+  firstName: "",
+  lastName: "",
   birthDate: "",
   parentName: "",
   parentPhone: "",
@@ -48,7 +49,8 @@ const CLASS_CAPACITY = 20
 
 // Column header variants accepted in the imported Excel file (matched trimmed/lowercased)
 const COLUMN_ALIASES = {
-  fullName: ["الاسم الكامل", "الاسم و اللقب", "الاسم واللقب", "الاسم", "الإسم", "fullname", "full name", "name"],
+  firstName: ["الإسم", "الاسم", "firstname", "first name"],
+  lastName: ["اللقب", "lastname", "last name", "surname"],
   birthDate: ["تاريخ الولادة", "birthdate", "birth date"],
   parentName: ["اسم الولي", "ولي الأمر", "parent", "parentname"],
   parentPhone: ["هاتف الولي", "رقم هاتف الولي", "رقم الهاتف", "phone", "parentphone"],
@@ -85,18 +87,6 @@ function toDateString(value) {
   const parsed = new Date(str)
   if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
   return ""
-}
-
-// يقسّم "الاسم الكامل" المُدخل في حقل واحد إلى firstName/lastName داخليًا —
-// فقط للحفاظ على توافق بقية التطبيق (الاستيراد من Excel، الحرف الأول في
-// الصورة الرمزية...) التي ما زالت تعتمد على هذين الحقلين. الكلمة الأولى
-// تُعتبر الاسم، وما تبقّى يُعتبر اللقب؛ إن كانت كلمة واحدة فقط يبقى اللقب
-// فارغاً (مسموح الآن، بخلاف سابقاً حين كان الحقلان منفصلين وإجباريين).
-function splitFullName(full) {
-  const trimmed = full.trim().replace(/\s+/g, " ")
-  const idx = trimmed.indexOf(" ")
-  if (idx === -1) return { firstName: trimmed, lastName: "" }
-  return { firstName: trimmed.slice(0, idx), lastName: trimmed.slice(idx + 1) }
 }
 
 function toActiveBool(value) {
@@ -164,7 +154,8 @@ export default function Students() {
   const openEdit = (s) => {
     setEditingId(s.id)
     setForm({
-      fullName: s.name || `${s.firstName || ""} ${s.lastName || ""}`.trim(),
+      firstName: s.firstName || "",
+      lastName: s.lastName || "",
       birthDate: s.birthDate || "",
       parentName: s.parentName || "",
       parentPhone: s.parentPhone || "",
@@ -180,13 +171,14 @@ export default function Students() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    if (!form.fullName.trim() || !form.birthDate || !form.classId) {
-      setError("يرجى إدخال اسم الطالب وتاريخ الولادة واختيار القسم")
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.birthDate || !form.classId) {
+      setError("يرجى إدخال الإسم واللقب وتاريخ الولادة واختيار القسم")
       return
     }
     const cls = classes.find((c) => c.id === form.classId)
-    const fullName = form.fullName.trim().replace(/\s+/g, " ")
-    const { firstName, lastName } = splitFullName(fullName)
+    const firstName = form.firstName.trim().replace(/\s+/g, " ")
+    const lastName = form.lastName.trim().replace(/\s+/g, " ")
+    const fullName = `${firstName} ${lastName}`.trim()
     const currentSeats = students.filter(
       (s) => s.classId === form.classId && !s.waitlisted && s.id !== editingId
     ).length
@@ -253,7 +245,8 @@ export default function Students() {
   const handleDownloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
       {
-        "الاسم الكامل": "محمد بن علي",
+        "الإسم": "محمد",
+        "اللقب": "بن علي",
         "تاريخ الولادة": "2015-03-12",
         "اسم الولي": "علي بن علي",
         "هاتف الولي": "20123456",
@@ -292,7 +285,9 @@ export default function Students() {
 
         rawRows.forEach((row, idx) => {
           const rowNum = idx + 2 // +1 for header row, +1 for 1-based
-          const fullName = String(findValue(row, "fullName") || "").trim().replace(/\s+/g, " ")
+          const firstName = String(findValue(row, "firstName") || "").trim().replace(/\s+/g, " ")
+          const lastName = String(findValue(row, "lastName") || "").trim().replace(/\s+/g, " ")
+          const fullName = `${firstName} ${lastName}`.trim()
           const birthDateRaw = findValue(row, "birthDate")
           const birthDate = toDateString(birthDateRaw)
           const parentName = String(findValue(row, "parentName") || "").trim()
@@ -305,8 +300,8 @@ export default function Students() {
 
           if (!fullName && !classNameRaw) return // skip fully empty row
 
-          if (!fullName) {
-            errors.push(`السطر ${rowNum}: اسم الطالب مطلوب`)
+          if (!firstName || !lastName) {
+            errors.push(`السطر ${rowNum}: الإسم واللقب مطلوبان`)
             return
           }
           if (!birthDate) {
@@ -328,7 +323,6 @@ export default function Students() {
           }
           seenInFile.add(key)
 
-          const { firstName, lastName } = splitFullName(fullName)
           parsed.push({
             firstName,
             lastName,
@@ -503,9 +497,14 @@ export default function Students() {
       >
         <form id="student-form" onSubmit={handleSubmit} className="space-y-3">
           <FloatingInput
-            label="الاسم الكامل"
-            value={form.fullName}
-            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            label="الإسم"
+            value={form.firstName}
+            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+          />
+          <FloatingInput
+            label="اللقب"
+            value={form.lastName}
+            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
           />
           <label className="block text-xs text-gray-500 dark:text-gray-400">تاريخ الولادة</label>
           <input
@@ -600,7 +599,7 @@ export default function Students() {
           {!importResult && (
             <>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                الأعمدة المطلوبة: الاسم الكامل، تاريخ الولادة، القسم (يجب أن يطابق اسم قسم موجود في التطبيق).
+                الأعمدة المطلوبة: الإسم، اللقب، تاريخ الولادة، القسم (يجب أن يطابق اسم قسم موجود في التطبيق).
                 يمكن أيضاً إضافة: اسم الولي، هاتف الولي، مقدار الحفظ، تاريخ التسجيل، نشط.
               </p>
               <button
