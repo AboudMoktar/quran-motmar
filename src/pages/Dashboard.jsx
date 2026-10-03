@@ -208,7 +208,7 @@ export default function Dashboard() {
         : `نلاحظ أن كراس القسم لحصة اليوم (${today}) لم يُسجَّل بعد للأقسام التالية:`,
       ...(entry.classes.length > 1 ? entry.classes.map((c) => `- ${c.name}`) : []),
       "",
-      "برجاء تسجيل الحصة في كراس القسم في أقرب وقت ممكن.",
+      "الرجاء تسجيل الحصة في كراس القسم في أقرب وقت ممكن.",
       "بارك الله فيكم وجزاكم خيرًا.",
     ]
     return lines.join("\n")
@@ -225,7 +225,7 @@ export default function Dashboard() {
         `- ${entry.classes.map((c) => c.name).join("، ")}: ${entry.teacherName}`
       ),
       "",
-      "برجاء تسجيل الحصة في كراس القسم في أقرب وقت ممكن.",
+      "الرجاء تسجيل الحصة في كراس القسم في أقرب وقت ممكن.",
       "بارك الله فيكم وجزاكم خيرًا.",
     ]
     return lines.join("\n")
