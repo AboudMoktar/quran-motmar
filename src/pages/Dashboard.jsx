@@ -15,12 +15,30 @@ function toLocalISODate(d) {
   return `${y}-${m}-${day}`
 }
 
+// يحوّل رقم هاتف محلي (مثال: "20123456") إلى الصيغة الدولية التي يتطلبها
+// رابط wa.me (بدون "+" وبدون صفر في البداية، مع بادئة رمز البلد تونس 216) —
+// إن كان الرقم يبدأ أصلاً بـ"216" أو "+216" يُترك كما هو بعد التنظيف فقط.
+function toWhatsAppNumber(phone) {
+  const digits = String(phone || "").replace(/\D/g, "")
+  if (!digits) return ""
+  if (digits.startsWith("216")) return digits
+  return `216${digits.replace(/^0+/, "")}`
+}
+
+// يفتح محادثة واتساب مباشرة مع رقم هاتف محدد (الأستاذ المعني) مع نص جاهز —
+// هذا يُرسل تنبيهًا فعليًا وشخصيًا لصاحب الرقم مباشرة (بخلاف رسالة عامة في
+// مجموعة، حيث لا يوجد ضمان أن يراها الأستاذ المعني أو يُشعَر بها فعليًا).
+function openWhatsAppTo(phone, text) {
+  const number = toWhatsAppNumber(phone)
+  if (!number) return
+  window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`, "_blank")
+}
+
 // يفتح واتساب (تطبيق الهاتف أو واتساب ويب) مع نص جاهز، بدون رقم هاتف محدد —
-// هذا يجعل واتساب يعرض قائمة المحادثات/المجموعات ليختار المستخدم يدويًا
-// المجموعة المطلوبة (مثل "أطفال القرآن")، فالتطبيق لا يستطيع الإرسال
-// تلقائيًا إلى مجموعة محدّدة بالاسم (لا توجد صلاحية API لذلك)، لكنه يوفّر
-// النص جاهزًا للصق بضغطة واحدة بدل كتابته يدويًا.
-function openWhatsApp(text) {
+// يُستعمل فقط كبديل احتياطي لإعلام المجموعة كلها دفعة واحدة (مثلاً حين لا
+// يتوفر رقم هاتف لأستاذ معيّن)، حيث يختار المستخدم يدويًا المحادثة/المجموعة
+// المطلوبة من قائمة واتساب.
+function openWhatsAppBroadcast(text) {
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank")
 }
 
@@ -162,16 +180,50 @@ export default function Dashboard() {
     (c) => classIdsWithAttendanceToday.has(c.id) && !classIdsWithNotebookToday.has(c.id)
   )
 
+  // نفس الأقسام لكن مُجمَّعة حسب الأستاذ، لأن أستاذاً واحداً قد يكون
+  // مسؤولاً عن أكثر من قسم فيهما حصة اليوم بلا كراس مُسجَّل — رسالة واحدة
+  // شخصية لكل أستاذ تذكر كل أقسامه المعنية دفعة واحدة، بدل رسالة منفصلة
+  // لكل قسم.
+  const teachersMissingNotebookToday = (() => {
+    const map = new Map()
+    classesMissingNotebookToday.forEach((c) => {
+      const teacher = teachers.find((t) => t.id === c.teacherId)
+      const key = teacher?.id || c.teacherId || c.teacherName || c.id
+      if (!map.has(key)) {
+        map.set(key, { teacher, teacherName: c.teacherName || teacher?.name || "-", classes: [] })
+      }
+      map.get(key).classes.push(c)
+    })
+    return Array.from(map.values())
+  })()
+
+  // رسالة شخصية لأستاذ واحد (تُرسَل مباشرة إلى رقمه عبر واتساب) — أفضل من
+  // إشارة "@" نصية في رسالة جماعية، لأنها تصل فعليًا وتُشعِر صاحبها مباشرة.
+  const teacherReminderMessage = (entry) => {
+    const lines = [
+      `السلام عليكم ${entry.teacherName}،`,
+      "",
+      entry.classes.length === 1
+        ? `نلاحظ أن كراس القسم لحصة اليوم (${today}) لقسم «${entry.classes[0].name}» لم يُسجَّل بعد.`
+        : `نلاحظ أن كراس القسم لحصة اليوم (${today}) لم يُسجَّل بعد للأقسام التالية:`,
+      ...(entry.classes.length > 1 ? entry.classes.map((c) => `- ${c.name}`) : []),
+      "",
+      "برجاء تسجيل الحصة في كراس القسم في أقرب وقت ممكن.",
+      "بارك الله فيكم وجزاكم خيرًا.",
+    ]
+    return lines.join("\n")
+  }
+
+  // رسالة جماعية احتياطية فقط — تُستعمل حين لا يتوفر رقم هاتف لأستاذ معيّن،
+  // فتُرسَل للمجموعة كاملة بدل عدم إعلام أحد.
   const notebookReminderMessage = () => {
     const lines = [
       "السلام عليكم ورحمة الله وبركاته،",
       "",
       `تذكير بملء كراس القسم لحصة اليوم (${today}):`,
-      ...classesMissingNotebookToday.map((c) => {
-        const teacher = teachers.find((t) => t.id === c.teacherId)
-        const teacherName = c.teacherName || teacher?.name || "-"
-        return `- ${c.name}: @${teacherName}`
-      }),
+      ...teachersMissingNotebookToday.map((entry) =>
+        `- ${entry.classes.map((c) => c.name).join("، ")}: ${entry.teacherName}`
+      ),
       "",
       "برجاء تسجيل الحصة في كراس القسم في أقرب وقت ممكن.",
       "بارك الله فيكم وجزاكم خيرًا.",
@@ -226,32 +278,44 @@ export default function Dashboard() {
             الأقسام التالية سُجّل فيها الحضور اليوم لكن الأستاذ لم يسجّل بعد حصة اليوم في كراس القسم
           </p>
           <div className="space-y-2">
-            {classesMissingNotebookToday.map((c) => {
-              const teacher = teachers.find((t) => t.id === c.teacherId)
-              return (
-                <div key={c.id} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg px-3 py-2">
+            {teachersMissingNotebookToday.map((entry) => (
+              <div key={entry.teacher?.id || entry.teacherName} className="bg-white dark:bg-gray-800 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{c.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{c.teacherName || teacher?.name || "-"}</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{entry.teacherName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {entry.classes.map((c) => c.name).join("، ")}
+                    </p>
                   </div>
-                  {teacher?.phone && (
-                    <a href={`tel:${teacher.phone}`} className="text-sm text-amber-700 dark:text-amber-400 font-medium" dir="ltr">
-                      {teacher.phone}
+                  {entry.teacher?.phone && (
+                    <a href={`tel:${entry.teacher.phone}`} className="text-sm text-amber-700 dark:text-amber-400 font-medium" dir="ltr">
+                      {entry.teacher.phone}
                     </a>
                   )}
                 </div>
-              )
-            })}
+                {entry.teacher?.phone ? (
+                  <button
+                    onClick={() => openWhatsAppTo(entry.teacher.phone, teacherReminderMessage(entry))}
+                    className="w-full bg-emerald-600 dark:bg-emerald-700 text-white rounded-lg py-1.5 text-xs font-medium"
+                  >
+                    إرسال تذكير عبر واتساب مباشرة لهذا الأستاذ
+                  </button>
+                ) : (
+                  <p className="text-[11px] text-red-500 dark:text-red-400 text-center">
+                    لا يوجد رقم هاتف مسجَّل لهذا الأستاذ — استعمل الإرسال الجماعي أدناه
+                  </p>
+                )}
+              </div>
+            ))}
           </div>
           <button
-            onClick={() => openWhatsApp(notebookReminderMessage())}
-            className="w-full bg-emerald-600 dark:bg-emerald-700 text-white rounded-lg py-2 text-sm font-medium mt-3"
+            onClick={() => openWhatsAppBroadcast(notebookReminderMessage())}
+            className="w-full bg-gray-700 dark:bg-gray-600 text-white rounded-lg py-2 text-sm font-medium mt-3"
           >
-            إرسال تذكير عبر واتساب لمجموعة الأساتذة
+            أو إرسال تذكير جماعي عبر واتساب (لمن لا يوجد رقمه)
           </button>
           <p className="text-[11px] text-amber-600 dark:text-amber-300/70 mt-1 text-center">
-            سيفتح واتساب مع نص التذكير جاهزًا (يذكر اسم كل أستاذ مسبوقاً بـ @) — اختر مجموعة "أطفال القرآن" لإرساله.
-            ملاحظة: الإشارة الفعلية القابلة للنقر (mention) في واتساب تتطلب كتابة @ يدويًا داخل المجموعة واختيار العضو من القائمة؛ النص الجاهز هنا يضع @ أمام الاسم كعلامة مرئية فقط.
+            الزر الأخضر يفتح محادثة واتساب مباشرة مع هاتف الأستاذ المعني، فيصله التنبيه فعليًا. الزر الرمادي بديل احتياطي فقط يفتح واتساب بدون مستلم محدد، لتختار المجموعة يدويًا.
           </p>
         </div>
       )}
