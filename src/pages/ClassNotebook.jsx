@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { collection, onSnapshot, query, where } from "firebase/firestore"
-import { Pencil, Trash2, ChevronDown, ChevronUp, X } from "lucide-react"
+import { Link } from "react-router-dom"
+import { Pencil, Trash2, ChevronDown, ChevronUp, X, LayoutDashboard } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 import { SURAHS, surahName } from "../utils/quran"
@@ -197,9 +198,20 @@ export default function ClassNotebook() {
 
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">
-        📚 {selectedClass ? `كراس قسم ${selectedClass.name}` : "كراس القسم"}
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+          📚 {selectedClass ? `كراس قسم ${selectedClass.name}` : "كراس القسم"}
+        </h2>
+        {/* رابط إلى المتابعة البيداغوجية (نظرة عامة + تصدير PDF/Excel)، مفتوح
+            الآن للأستاذ أيضًا على بياناته الخاصة فقط. */}
+        <Link
+          to="/pedagogical-dashboard"
+          className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400 font-medium"
+        >
+          <LayoutDashboard size={14} />
+          التقارير
+        </Link>
+      </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
         <select

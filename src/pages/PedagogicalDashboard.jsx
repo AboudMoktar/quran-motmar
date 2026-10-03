@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { collection, onSnapshot, query, where } from "firebase/firestore"
-import { ChevronLeft, Search, X } from "lucide-react"
+import { ChevronLeft, Search, X, FileText, FileSpreadsheet } from "lucide-react"
 import { db } from "../firebase"
+import { useAuth } from "../context/AuthContext"
 import { SURAHS } from "../utils/quran"
 import { getAllSessions } from "../utils/classNotebook"
+import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
+import { printReport, printMultiSection } from "../utils/printReport"
 
 const DAYS_LABELS = {
   sun: "الأحد", mon: "الإثنين", tue: "الثلاثاء", wed: "الأربعاء",
@@ -32,8 +35,14 @@ function lastLessonsLabel(lessons) {
 // لوحة واحدة تجمع كل ما سبق (الأقسام/الأساتذة/الحصص) في نظرة عامة، مع
 // إمكانية الضغط على أي عنصر للانتقال مباشرة إلى تفاصيله في "تطور الأقسام"
 // أو "متابعة الأساتذة" (عبر رابط يحمل classId / teacherId).
+// هذه الصفحة مفتوحة الآن للإدارة والأساتذة معًا: الإدارة ترى كل الأقسام
+// والأساتذة والحصص كما كانت، بينما يرى الأستاذ فقط أقسامه وحصصه الخاصة
+// (فلترة تلقائية حسب uid)، بدون قسم "الأساتذة" الذي يبقى خاصًا بالإدارة.
+// الانتقال إلى "تطور الأقسام"/"متابعة الأساتذة" (صفحتان خاصتان بالإدارة)
+// يبقى متاحًا فقط للإدارة؛ الأستاذ يرى بياناته هنا مباشرة بدون انتقال.
 export default function PedagogicalDashboard() {
   const navigate = useNavigate()
+  const { user, isAdminLevel } = useAuth()
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
   const [sessions, setSessions] = useState([])
@@ -47,20 +56,33 @@ export default function PedagogicalDashboard() {
   const [filterFrom, setFilterFrom] = useState("")
   const [filterTo, setFilterTo] = useState("")
 
+  // الإدارة تقرأ كل الأقسام بدون فلترة (كما كانت)؛ الأستاذ يقرأ فقط أقسامه
+  // الخاصة عبر where("teacherId","==",uid) — بنفس الاستعلام المستعمل في
+  // ClassNotebook.jsx، حتى يتوافق مع قاعدة الصلاحيات الحالية في Firestore.
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "classes"), (snap) => {
+    if (!user) return
+    const q = isAdminLevel
+      ? collection(db, "classes")
+      : query(collection(db, "classes"), where("teacherId", "==", user.uid))
+    const unsub = onSnapshot(q, (snap) => {
       setClasses(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => !c.deletedAt))
     })
     return unsub
-  }, [])
+  }, [isAdminLevel, user])
 
+  // قائمة كل الأساتذة (لقسم "الأساتذة" وفلتر الأستاذ) — للإدارة فقط، لأن
+  // صفحة "متابعة الأساتذة" نفسها تبقى خاصة بالإدارة.
   useEffect(() => {
+    if (!isAdminLevel) {
+      setTeachers([])
+      return
+    }
     const q = query(collection(db, "users"), where("role", "==", "teacher"))
     const unsub = onSnapshot(q, (snap) => {
       setTeachers(snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => !t.deletedAt))
     })
     return unsub
-  }, [])
+  }, [isAdminLevel])
 
   useEffect(() => {
     setLoadingSessions(true)
@@ -74,7 +96,12 @@ export default function PedagogicalDashboard() {
   const lastSessionForTeacher = (teacherId) => sessions.find((s) => s.teacherId === teacherId) || null
   const classesCountForTeacher = (teacherId) => classes.filter((c) => c.teacherId === teacherId).length
 
-  const recentSessions = sessions.slice(0, 8)
+  // الأستاذ لا يرى هنا إلا أقسامه وحصصه الخاصة فقط — نفس منطق التصفية
+  // المستعمل في ClassNotebook.jsx (teacherId === uid). الإدارة ترى الكل.
+  const effectiveClasses = isAdminLevel ? classes : classes.filter((c) => c.teacherId === user?.uid)
+  const effectiveSessions = isAdminLevel ? sessions : sessions.filter((s) => s.teacherId === user?.uid)
+
+  const recentSessions = effectiveSessions.slice(0, 8)
 
   const hasActiveFilters =
     filterClassId || filterTeacherId || filterSurah || filterFrom || filterTo
@@ -88,7 +115,7 @@ export default function PedagogicalDashboard() {
   }
 
   const filteredSessions = hasActiveFilters
-    ? sessions.filter((s) => {
+    ? effectiveSessions.filter((s) => {
         if (filterClassId && s.classId !== filterClassId) return false
         if (filterTeacherId && s.teacherId !== filterTeacherId) return false
         if (filterSurah && !(s.lessons || []).some((l) => String(l.surah) === String(filterSurah))) return false
@@ -98,9 +125,130 @@ export default function PedagogicalDashboard() {
       })
     : []
 
+  // ===== ترابط فلتر القسم وفلتر الأستاذ =====
+  // عند اختيار قسم: لا حاجة لاختيار الأستاذ بعدها — يُضبط فلتر الأستاذ
+  // تلقائيًا على أستاذ هذا القسم. وعند اختيار أستاذ: قائمة الأقسام تُصبح
+  // محصورة في أقسامه فقط (ويُمسح اختيار قسم سابق إن لم يكن من أقسامه).
+  const classOptionsForFilter = filterTeacherId
+    ? effectiveClasses.filter((c) => c.teacherId === filterTeacherId)
+    : effectiveClasses
+
+  const teacherOptionsForFilter = filterClassId
+    ? teachers.filter((t) => t.id === effectiveClasses.find((c) => c.id === filterClassId)?.teacherId)
+    : teachers
+
+  const handleFilterClassChange = (value) => {
+    setFilterClassId(value)
+    if (value) {
+      const cls = effectiveClasses.find((c) => c.id === value)
+      if (cls?.teacherId) setFilterTeacherId(cls.teacherId)
+    }
+  }
+
+  const handleFilterTeacherChange = (value) => {
+    setFilterTeacherId(value)
+    if (value && filterClassId) {
+      const cls = effectiveClasses.find((c) => c.id === filterClassId)
+      if (cls && cls.teacherId !== value) setFilterClassId("")
+    }
+  }
+
+  // ===== تصدير PDF / Excel — يُصدَّر دائمًا ما هو معروض حاليًا على الشاشة:
+  // النتائج المصفّاة فقط إن كان هناك فلتر نشط، وإلا نظرة عامة كاملة (نفس
+  // بيانات effectiveClasses/effectiveSessions المعروضة، مع قسم "الأساتذة"
+  // للإدارة فقط). لا قراءة إضافية من Firestore — تصدير محلي بالكامل. =====
+  const classRows = (list) =>
+    list.map((c) => {
+      const last = lastSessionForClass(c.id)
+      return {
+        القسم: c.name,
+        "آخر حصة": last ? friendlyDate(last.date) : "-",
+        "آخر الدروس": lastLessonsLabel(last?.lessons),
+      }
+    })
+
+  const teacherRows = () =>
+    teachers.map((t) => {
+      const last = lastSessionForTeacher(t.id)
+      return {
+        الأستاذ: t.name,
+        "عدد الأقسام": classesCountForTeacher(t.id),
+        "آخر حصة": last ? friendlyDate(last.date) : "-",
+      }
+    })
+
+  const sessionRows = (list) =>
+    list.map((s) => ({
+      التاريخ: friendlyDate(s.date),
+      القسم: s.className || "-",
+      الأستاذ: s.teacherName || "-",
+      الدروس: lastLessonsLabel(s.lessons),
+      ملاحظات: s.notes || "-",
+    }))
+
+  const filtersSummary = () => {
+    const parts = []
+    if (filterClassId) parts.push(`القسم: ${classes.find((c) => c.id === filterClassId)?.name || "-"}`)
+    if (filterTeacherId) parts.push(`الأستاذ: ${teachers.find((t) => t.id === filterTeacherId)?.name || "-"}`)
+    if (filterSurah) parts.push(`السورة: ${SURAHS.find((s) => String(s.number) === String(filterSurah))?.name || "-"}`)
+    if (filterFrom) parts.push(`من: ${filterFrom}`)
+    if (filterTo) parts.push(`إلى: ${filterTo}`)
+    return parts
+  }
+
+  const handleExportPdf = () => {
+    if (hasActiveFilters) {
+      printReport({
+        title: "تقرير الحصص المصفّاة",
+        subtitleLines: filtersSummary(),
+        rows: sessionRows(filteredSessions),
+      })
+      return
+    }
+    const sections = [
+      { heading: "الأقسام", rows: classRows(effectiveClasses) },
+      ...(isAdminLevel ? [{ heading: "الأساتذة", rows: teacherRows() }] : []),
+      { heading: "الحصص", rows: sessionRows(effectiveSessions) },
+    ]
+    printMultiSection({ title: "المتابعة البيداغوجية", sections })
+  }
+
+  const handleExportExcel = () => {
+    if (hasActiveFilters) {
+      exportExcel("حصص_مصفاة", sessionRows(filteredSessions), filtersSummary())
+      return
+    }
+    const sheets = [
+      { name: "الأقسام", rows: classRows(effectiveClasses) },
+      ...(isAdminLevel ? [{ name: "الأساتذة", rows: teacherRows() }] : []),
+      { name: "الحصص", rows: sessionRows(effectiveSessions) },
+    ]
+    exportExcelMultiSheet("المتابعة_البيداغوجية", sheets)
+  }
+
   return (
     <div>
-      <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">📊 المتابعة البيداغوجية</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">📊 المتابعة البيداغوجية</h2>
+        {!loadingSessions && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleExportPdf}
+              className="flex items-center gap-1 bg-gray-700 text-white rounded-lg px-2.5 py-1.5 text-xs"
+            >
+              <FileText size={14} />
+              PDF
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center gap-1 bg-emerald-700 text-white rounded-lg px-2.5 py-1.5 text-xs"
+            >
+              <FileSpreadsheet size={14} />
+              Excel
+            </button>
+          </div>
+        )}
+      </div>
 
       {loadingSessions && (
         <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-4">جارٍ التحميل...</p>
@@ -128,25 +276,27 @@ export default function PedagogicalDashboard() {
             <div className="grid grid-cols-2 gap-2">
               <select
                 value={filterClassId}
-                onChange={(e) => setFilterClassId(e.target.value)}
+                onChange={(e) => handleFilterClassChange(e.target.value)}
                 className="border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-xs dark:bg-gray-700 dark:text-white"
               >
                 <option value="">كل الأقسام</option>
-                {classes.map((c) => (
+                {classOptionsForFilter.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
 
-              <select
-                value={filterTeacherId}
-                onChange={(e) => setFilterTeacherId(e.target.value)}
-                className="border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-xs dark:bg-gray-700 dark:text-white"
-              >
-                <option value="">كل الأساتذة</option>
-                {teachers.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
+              {isAdminLevel && (
+                <select
+                  value={filterTeacherId}
+                  onChange={(e) => handleFilterTeacherChange(e.target.value)}
+                  className="border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-2 text-xs dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">كل الأساتذة</option>
+                  {teacherOptionsForFilter.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              )}
 
               <select
                 value={filterSurah}
@@ -185,19 +335,22 @@ export default function PedagogicalDashboard() {
                   عدد النتائج: {filteredSessions.length}
                 </p>
                 <div className="space-y-2">
-                  {filteredSessions.map((s) => (
-                    <button
-                      key={`filtered_${s.classId}_${s.date}`}
-                      onClick={() => navigate(`/classes-progress?classId=${s.classId}`)}
-                      className="w-full bg-gray-50 dark:bg-gray-700 rounded-lg p-3 flex items-center justify-between text-right"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">📅 {friendlyDate(s.date)} — {s.className}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">👨‍🏫 {s.teacherName || "-"} — 📖 {lastLessonsLabel(s.lessons)}</p>
-                      </div>
-                      <ChevronLeft size={18} className="text-gray-400 shrink-0" />
-                    </button>
-                  ))}
+                  {filteredSessions.map((s) => {
+                    const Wrapper = isAdminLevel ? "button" : "div"
+                    return (
+                      <Wrapper
+                        key={`filtered_${s.classId}_${s.date}`}
+                        onClick={isAdminLevel ? () => navigate(`/classes-progress?classId=${s.classId}`) : undefined}
+                        className="w-full bg-gray-50 dark:bg-gray-700 rounded-lg p-3 flex items-center justify-between text-right"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">📅 {friendlyDate(s.date)} — {s.className}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">👨‍🏫 {s.teacherName || "-"} — 📖 {lastLessonsLabel(s.lessons)}</p>
+                        </div>
+                        {isAdminLevel && <ChevronLeft size={18} className="text-gray-400 shrink-0" />}
+                      </Wrapper>
+                    )
+                  })}
                   {filteredSessions.length === 0 && (
                     <p className="text-gray-400 dark:text-gray-500 text-xs text-center py-4">
                       لا توجد حصص مطابقة لهذا البحث
@@ -211,15 +364,16 @@ export default function PedagogicalDashboard() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">الأقسام</p>
-              <span className="text-xs text-gray-500 dark:text-gray-400">عدد الأقسام: {classes.length}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">عدد الأقسام: {effectiveClasses.length}</span>
             </div>
             <div className="space-y-2">
-              {classes.map((c) => {
+              {effectiveClasses.map((c) => {
                 const last = lastSessionForClass(c.id)
+                const Wrapper = isAdminLevel ? "button" : "div"
                 return (
-                  <button
+                  <Wrapper
                     key={c.id}
-                    onClick={() => navigate(`/classes-progress?classId=${c.id}`)}
+                    onClick={isAdminLevel ? () => navigate(`/classes-progress?classId=${c.id}`) : undefined}
                     className="w-full bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3 flex items-center justify-between text-right"
                   >
                     <div>
@@ -231,66 +385,71 @@ export default function PedagogicalDashboard() {
                         <p className="text-xs text-gray-400 dark:text-gray-500">📅 {friendlyDate(last.date)}</p>
                       )}
                     </div>
-                    <ChevronLeft size={18} className="text-gray-400 shrink-0" />
-                  </button>
+                    {isAdminLevel && <ChevronLeft size={18} className="text-gray-400 shrink-0" />}
+                  </Wrapper>
                 )
               })}
-              {classes.length === 0 && (
+              {effectiveClasses.length === 0 && (
                 <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-4">لا توجد أقسام بعد</p>
               )}
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">الأساتذة</p>
-              <span className="text-xs text-gray-500 dark:text-gray-400">عدد الأساتذة: {teachers.length}</span>
+          {isAdminLevel && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">الأساتذة</p>
+                <span className="text-xs text-gray-500 dark:text-gray-400">عدد الأساتذة: {teachers.length}</span>
+              </div>
+              <div className="space-y-2">
+                {teachers.map((t) => {
+                  const last = lastSessionForTeacher(t.id)
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => navigate(`/teachers-tracking?teacherId=${t.id}`)}
+                      className="w-full bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3 flex items-center justify-between text-right"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          🏫 {classesCountForTeacher(t.id)} قسم — {last ? `آخر حصة: ${friendlyDate(last.date)}` : "لا توجد حصص مسجّلة بعد"}
+                        </p>
+                      </div>
+                      <ChevronLeft size={18} className="text-gray-400 shrink-0" />
+                    </button>
+                  )
+                })}
+                {teachers.length === 0 && (
+                  <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-4">لا يوجد أساتذة بعد</p>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              {teachers.map((t) => {
-                const last = lastSessionForTeacher(t.id)
-                return (
-                  <button
-                    key={t.id}
-                    onClick={() => navigate(`/teachers-tracking?teacherId=${t.id}`)}
-                    className="w-full bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3 flex items-center justify-between text-right"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        🏫 {classesCountForTeacher(t.id)} قسم — {last ? `آخر حصة: ${friendlyDate(last.date)}` : "لا توجد حصص مسجّلة بعد"}
-                      </p>
-                    </div>
-                    <ChevronLeft size={18} className="text-gray-400 shrink-0" />
-                  </button>
-                )
-              })}
-              {teachers.length === 0 && (
-                <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-4">لا يوجد أساتذة بعد</p>
-              )}
-            </div>
-          </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">الحصص</p>
-              <span className="text-xs text-gray-500 dark:text-gray-400">عدد الحصص المسجّلة: {sessions.length}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">عدد الحصص المسجّلة: {effectiveSessions.length}</span>
             </div>
             <div className="space-y-2">
-              {recentSessions.map((s) => (
-                <button
-                  key={`${s.classId}_${s.date}`}
-                  onClick={() => navigate(`/classes-progress?classId=${s.classId}`)}
-                  className="w-full bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3 flex items-center justify-between text-right"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">📅 {friendlyDate(s.date)} — {s.className}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">👨‍🏫 {s.teacherName || "-"} — {(s.lessons || []).length} دروس</p>
-                  </div>
-                  <ChevronLeft size={18} className="text-gray-400 shrink-0" />
-                </button>
-              ))}
-              {sessions.length === 0 && (
+              {recentSessions.map((s) => {
+                const Wrapper = isAdminLevel ? "button" : "div"
+                return (
+                  <Wrapper
+                    key={`${s.classId}_${s.date}`}
+                    onClick={isAdminLevel ? () => navigate(`/classes-progress?classId=${s.classId}`) : undefined}
+                    className="w-full bg-white dark:bg-gray-800 rounded-xl shadow-sm p-3 flex items-center justify-between text-right"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">📅 {friendlyDate(s.date)} — {s.className}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">👨‍🏫 {s.teacherName || "-"} — {(s.lessons || []).length} دروس</p>
+                    </div>
+                    {isAdminLevel && <ChevronLeft size={18} className="text-gray-400 shrink-0" />}
+                  </Wrapper>
+                )
+              })}
+              {effectiveSessions.length === 0 && (
                 <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-4">لا توجد حصص مسجّلة بعد</p>
               )}
             </div>
