@@ -157,9 +157,18 @@ export default function PedagogicalDashboard() {
 
   const handleFilterTeacherChange = (value) => {
     setFilterTeacherId(value)
-    if (value && filterClassId) {
-      const cls = effectiveClasses.find((c) => c.id === filterClassId)
-      if (cls && cls.teacherId !== value) setFilterClassId("")
+    if (value) {
+      // كل قسم له أستاذ واحد بالضبط، لكن الأستاذ قد يُدرّس عدة أقسام —
+      // فإذا كان لهذا الأستاذ قسم واحد فقط، نضبط فلتر القسم عليه تلقائيًا
+      // (بنفس منطق قسم → أستاذ)، وإلا نكتفي بحصر قائمة الأقسام في أقسامه
+      // (classOptionsForFilter) ونمسح أي قسم سابق لا ينتمي له.
+      const teacherClasses = effectiveClasses.filter((c) => c.teacherId === value)
+      if (teacherClasses.length === 1) {
+        setFilterClassId(teacherClasses[0].id)
+      } else if (filterClassId) {
+        const cls = effectiveClasses.find((c) => c.id === filterClassId)
+        if (!cls || cls.teacherId !== value) setFilterClassId("")
+      }
     }
   }
 
