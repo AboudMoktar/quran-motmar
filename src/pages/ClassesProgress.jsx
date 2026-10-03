@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { collection, onSnapshot } from "firebase/firestore"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { db } from "../firebase"
@@ -26,6 +27,7 @@ function surahName(num) {
 }
 
 export default function ClassesProgress() {
+  const [searchParams] = useSearchParams()
   const [classes, setClasses] = useState([])
   const [classId, setClassId] = useState("")
   const [sessions, setSessions] = useState([])
@@ -40,6 +42,15 @@ export default function ClassesProgress() {
     })
     return unsub
   }, [])
+
+  // يفتح القسم مباشرة إن جاء رابط من "المتابعة البيداغوجية" يحمل
+  // ?classId=... — بمجرد تحميل قائمة الأقسام، ولمرة واحدة فقط.
+  useEffect(() => {
+    const requested = searchParams.get("classId")
+    if (requested && classes.some((c) => c.id === requested) && !classId) {
+      setClassId(requested)
+    }
+  }, [classes, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!classId) {

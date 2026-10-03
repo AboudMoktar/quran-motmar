@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useSearchParams } from "react-router-dom"
 import { collection, onSnapshot, query, where } from "firebase/firestore"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { db } from "../firebase"
@@ -27,6 +28,7 @@ function surahName(num) {
 // هذه الصفحة للمتابعة فقط — بدون أي ترتيب أو تقييم أو نقاط للأساتذة، بنفس
 // ما هو منصوص عليه صراحة في المواصفات (لا ترتيب، لا تقييم).
 export default function TeachersTracking() {
+  const [searchParams] = useSearchParams()
   const [teachers, setTeachers] = useState([])
   const [classes, setClasses] = useState([])
   const [teacherId, setTeacherId] = useState("")
@@ -48,6 +50,15 @@ export default function TeachersTracking() {
     })
     return unsub
   }, [])
+
+  // يفتح الأستاذ مباشرة إن جاء رابط من "المتابعة البيداغوجية" يحمل
+  // ?teacherId=... — بمجرد تحميل قائمة الأساتذة، ولمرة واحدة فقط.
+  useEffect(() => {
+    const requested = searchParams.get("teacherId")
+    if (requested && teachers.some((t) => t.id === requested) && !teacherId) {
+      setTeacherId(requested)
+    }
+  }, [teachers, searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!teacherId) {
