@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { collection, onSnapshot, query, where } from "firebase/firestore"
-import { Pencil, Trash2, ChevronDown, ChevronUp, X } from "lucide-react"
+import { Pencil, Trash2, ChevronDown, ChevronUp, X, MessageCircle } from "lucide-react"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
 import { SURAHS, surahName } from "../utils/quran"
@@ -9,6 +9,7 @@ import {
   saveSession,
   deleteSession,
   newLessonId,
+  buildReviewMessage,
 } from "../utils/classNotebook"
 import { logActivity } from "../utils/activityLog"
 import FAB from "../components/FAB"
@@ -66,6 +67,13 @@ export default function ClassNotebook() {
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
 
+  // توليد رسالة "المطلوب مراجعته" لحصة واحدة (المرحلة 7) — لا علاقة لها
+  // بإرسال فعلي أو باختيار المستلمين (ذلك في "الرسائل"، المرحلة 8)؛ هنا فقط
+  // توليد نص قابل للتعديل والنسخ.
+  const [messageDate, setMessageDate] = useState(null) // تاريخ الحصة المفتوحة رسالتها حاليًا
+  const [messageText, setMessageText] = useState("")
+  const [messageCopied, setMessageCopied] = useState(false)
+
   useEffect(() => {
     const q = role === "teacher"
       ? query(collection(db, "classes"), where("teacherId", "==", user.uid))
@@ -92,6 +100,7 @@ export default function ClassNotebook() {
   useEffect(() => {
     loadSessions(classId)
     setOpenDates({})
+    setMessageDate(null)
   }, [classId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleDate = (d) => setOpenDates((prev) => ({ ...prev, [d]: !prev[d] }))
@@ -187,6 +196,23 @@ export default function ClassNotebook() {
     setSaving(false)
   }
 
+  const openReviewMessage = (session) => {
+    if (messageDate === session.date) {
+      setMessageDate(null)
+      return
+    }
+    setMessageDate(session.date)
+    setMessageText(buildReviewMessage(session))
+    setMessageCopied(false)
+  }
+
+  const copyReviewMessage = () => {
+    navigator.clipboard.writeText(messageText).then(() => {
+      setMessageCopied(true)
+      setTimeout(() => setMessageCopied(false), 2500)
+    })
+  }
+
   const handleDelete = async (session) => {
     if (confirm("هل تريد حذف هذه الحصة نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.")) {
       await deleteSession(session.classId, session.date)
@@ -277,6 +303,42 @@ export default function ClassNotebook() {
                       <Trash2 size={14} /> حذف
                     </button>
                   </div>
+
+                  <button
+                    onClick={() => openReviewMessage(session)}
+                    className="w-full flex items-center justify-center gap-1 border border-gray-300 dark:border-gray-600 rounded-lg py-1.5 text-xs text-gray-700 dark:text-gray-300"
+                  >
+                    <MessageCircle size={14} /> 📱 إنشاء رسالة للأولياء
+                  </button>
+
+                  {messageDate === session.date && (
+                    <div className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">نص الرسالة (قابل للتعديل)</p>
+                        <button
+                          onClick={() => setMessageText(buildReviewMessage(session))}
+                          className="text-xs text-emerald-700 dark:text-emerald-400"
+                        >
+                          استعادة النص الافتراضي
+                        </button>
+                      </div>
+                      <textarea
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        rows={6}
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs dark:bg-gray-700 dark:text-white"
+                      />
+                      <button
+                        onClick={copyReviewMessage}
+                        className="w-full bg-gray-700 text-white rounded-lg py-2 text-xs"
+                      >
+                        {messageCopied ? "تم النسخ ✓" : "نسخ النص"}
+                      </button>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+                        لإرسال الرسالة لأولياء قسم كامل مع اختيار الطلبة، استعمل "الرسائل" من القائمة
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
