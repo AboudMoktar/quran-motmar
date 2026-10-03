@@ -23,7 +23,7 @@ export default function BottomNav({ isAdminLevel }) {
 
   const isActive = (to) => {
     if (to === "/more") {
-      return ["/teachers", "/reports", "/payments", "/progress", "/notebook", "/classes-progress", "/teachers-tracking", "/more"].includes(location.pathname)
+      return ["/teachers", "/reports", "/payments", "/progress", "/notebook", "/classes-progress", "/teachers-tracking", "/pedagogical-dashboard", "/more"].includes(location.pathname)
     }
     return location.pathname === to
   }
