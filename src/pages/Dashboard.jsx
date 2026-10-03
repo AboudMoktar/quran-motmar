@@ -169,7 +169,8 @@ export default function Dashboard() {
       `تذكير بملء كراس القسم لحصة اليوم (${today}):`,
       ...classesMissingNotebookToday.map((c) => {
         const teacher = teachers.find((t) => t.id === c.teacherId)
-        return `- ${c.name} (${c.teacherName || teacher?.name || "-"})`
+        const teacherName = c.teacherName || teacher?.name || "-"
+        return `- ${c.name}: @${teacherName}`
       }),
       "",
       "برجاء تسجيل الحصة في كراس القسم في أقرب وقت ممكن.",
@@ -249,7 +250,8 @@ export default function Dashboard() {
             إرسال تذكير عبر واتساب لمجموعة الأساتذة
           </button>
           <p className="text-[11px] text-amber-600 dark:text-amber-300/70 mt-1 text-center">
-            سيفتح واتساب مع نص التذكير جاهزًا — اختر مجموعة "أطفال القرآن" لإرساله
+            سيفتح واتساب مع نص التذكير جاهزًا (يذكر اسم كل أستاذ مسبوقاً بـ @) — اختر مجموعة "أطفال القرآن" لإرساله.
+            ملاحظة: الإشارة الفعلية القابلة للنقر (mention) في واتساب تتطلب كتابة @ يدويًا داخل المجموعة واختيار العضو من القائمة؛ النص الجاهز هنا يضع @ أمام الاسم كعلامة مرئية فقط.
           </p>
         </div>
       )}
