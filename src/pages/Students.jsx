@@ -34,8 +34,7 @@ export function calculateAge(birthDate) {
 }
 
 const emptyForm = {
-  firstName: "",
-  lastName: "",
+  fullName: "",
   birthDate: "",
   parentName: "",
   parentPhone: "",
@@ -87,6 +86,18 @@ function toDateString(value) {
   const parsed = new Date(str)
   if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
   return ""
+}
+
+// يقسّم "الاسم الكامل" المُدخل في حقل واحد إلى firstName/lastName داخليًا —
+// فقط للحفاظ على توافق بقية التطبيق (الاستيراد من Excel، الحرف الأول في
+// الصورة الرمزية...) التي ما زالت تعتمد على هذين الحقلين. الكلمة الأولى
+// تُعتبر الاسم، وما تبقّى يُعتبر اللقب؛ إن كانت كلمة واحدة فقط يبقى اللقب
+// فارغاً (مسموح الآن، بخلاف سابقاً حين كان الحقلان منفصلين وإجباريين).
+function splitFullName(full) {
+  const trimmed = full.trim().replace(/\s+/g, " ")
+  const idx = trimmed.indexOf(" ")
+  if (idx === -1) return { firstName: trimmed, lastName: "" }
+  return { firstName: trimmed.slice(0, idx), lastName: trimmed.slice(idx + 1) }
 }
 
 function toActiveBool(value) {
@@ -154,8 +165,7 @@ export default function Students() {
   const openEdit = (s) => {
     setEditingId(s.id)
     setForm({
-      firstName: s.firstName || "",
-      lastName: s.lastName || "",
+      fullName: s.name || `${s.firstName || ""} ${s.lastName || ""}`.trim(),
       birthDate: s.birthDate || "",
       parentName: s.parentName || "",
       parentPhone: s.parentPhone || "",
@@ -171,19 +181,20 @@ export default function Students() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    if (!form.firstName.trim() || !form.lastName.trim() || !form.birthDate || !form.classId) {
-      setError("يرجى إدخال الإسم واللقب وتاريخ الولادة واختيار القسم")
+    if (!form.fullName.trim() || !form.birthDate || !form.classId) {
+      setError("يرجى إدخال اسم الطالب وتاريخ الولادة واختيار القسم")
       return
     }
     const cls = classes.find((c) => c.id === form.classId)
-    const fullName = `${form.firstName.trim()} ${form.lastName.trim()}`
+    const fullName = form.fullName.trim().replace(/\s+/g, " ")
+    const { firstName, lastName } = splitFullName(fullName)
     const currentSeats = students.filter(
       (s) => s.classId === form.classId && !s.waitlisted && s.id !== editingId
     ).length
     const willWaitlist = currentSeats >= CLASS_CAPACITY
     const data = {
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
+      firstName,
+      lastName,
       name: fullName,
       birthDate: form.birthDate,
       parentName: form.parentName.trim(),
@@ -494,14 +505,9 @@ export default function Students() {
       >
         <form id="student-form" onSubmit={handleSubmit} className="space-y-3">
           <FloatingInput
-            label="الإسم"
-            value={form.firstName}
-            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-          />
-          <FloatingInput
-            label="اللقب"
-            value={form.lastName}
-            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+            label="الاسم الكامل"
+            value={form.fullName}
+            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
           />
           <label className="block text-xs text-gray-500 dark:text-gray-400">تاريخ الولادة</label>
           <input

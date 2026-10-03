@@ -135,6 +135,22 @@ export default function Messages() {
   const [reviewCopied, setReviewCopied] = useState(false)
   const [reviewNumbersCopied, setReviewNumbersCopied] = useState(false)
 
+  // نوع الرسالة المختار حاليًا — الصفحة أصبحت كتلة واحدة تعرض فقط حقول
+  // النوع المختار، بدل خمس بطاقات معروضة كلها في آن واحد.
+  const [messageType, setMessageType] = useState("start")
+
+  // رسالة مخصصة (جديدة) — نص حرّ + اختيار المستلمين من قائمة كل الطلاب
+  // (الكل محدَّد افتراضيًا، مع إمكانية إلغاء تحديد من لا يُراد مراسلته).
+  const [customText, setCustomText] = useState("")
+  const [customSearch, setCustomSearch] = useState("")
+  const [customStudents, setCustomStudents] = useState([])
+  const [customSelectedIds, setCustomSelectedIds] = useState(new Set())
+  const [loadingCustomStudents, setLoadingCustomStudents] = useState(false)
+  const [customLoaded, setCustomLoaded] = useState(false)
+  const [customError, setCustomError] = useState("")
+  const [customCopied, setCustomCopied] = useState(false)
+  const [customNumbersCopied, setCustomNumbersCopied] = useState(false)
+
   useEffect(() => {
     getMonthlyFee().then(setMonthlyFee)
   }, [])
@@ -404,6 +420,78 @@ export default function Messages() {
     openSms(recipients.map((r) => r.phone), reviewText)
   }
 
+  // يُحمَّل مرة واحدة فقط عند أول اختيار لنوع "رسالة مخصصة"، وليس في كل
+  // مرة — بنفس أسلوب enrolledRecipients في القسم الأول.
+  const loadCustomStudents = async () => {
+    if (customLoaded) return
+    setLoadingCustomStudents(true)
+    setCustomError("")
+    try {
+      const snap = await getDocs(collection(db, "students"))
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((s) => !s.deletedAt && s.active !== false && s.parentPhone && s.parentPhone.trim())
+        .map((s) => ({ id: s.id, name: s.name, phone: s.parentPhone.trim(), className: s.className || "" }))
+      setCustomStudents(list)
+      setCustomSelectedIds(new Set(list.map((s) => s.id))) // الكل محدَّد افتراضيًا
+      setCustomLoaded(true)
+    } catch {
+      setCustomError("تعذّر تحميل قائمة الطلاب")
+    }
+    setLoadingCustomStudents(false)
+  }
+
+  useEffect(() => {
+    if (messageType === "custom") loadCustomStudents()
+  }, [messageType]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleCustomStudent = (id) => {
+    setCustomSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const selectAllCustom = () => setCustomSelectedIds(new Set(customStudents.map((s) => s.id)))
+  const deselectAllCustom = () => setCustomSelectedIds(new Set())
+
+  const customFilteredStudents = customStudents.filter((s) =>
+    (s.name || "").toLowerCase().includes(customSearch.toLowerCase())
+  )
+
+  const customRecipients = () => customStudents.filter((s) => customSelectedIds.has(s.id))
+
+  // إرسال فعلي فقط بعد تأكيد صريح يذكر عدد المستلمين، بنفس مبدأ رسالة
+  // المراجعة حسب القسم.
+  const handleCustomConfirmSend = () => {
+    setCustomError("")
+    if (!customText.trim()) {
+      setCustomError("يرجى كتابة نص الرسالة")
+      return
+    }
+    const recipients = customRecipients()
+    if (recipients.length === 0) {
+      setCustomError("لم يتم اختيار أي مستلم")
+      return
+    }
+    if (!confirm(`سيتم فتح تطبيق الرسائل لإرسال هذا النص إلى ${recipients.length} ولي أمر. هل تريد المتابعة؟`)) return
+    openSms(recipients.map((r) => r.phone), customText)
+  }
+
+  const handleCustomCopyNumbers = () => {
+    const recipients = customRecipients()
+    if (recipients.length === 0) {
+      setCustomError("لم يتم اختيار أي مستلم")
+      return
+    }
+    copyText(recipients.map((r) => r.phone).join(", "), () => {
+      setCustomNumbersCopied(true)
+      setTimeout(() => setCustomNumbersCopied(false), 2500)
+    })
+  }
+
   const handleReviewCopyNumbers = () => {
     const recipients = reviewRecipients()
     if (recipients.length === 0) {
@@ -416,11 +504,34 @@ export default function Messages() {
     })
   }
 
+  const MESSAGE_TYPES = [
+    { id: "start", label: "📅 موعد الحصة" },
+    { id: "payment", label: "💳 تذكير الاشتراك" },
+    { id: "absence", label: "📋 تذكير الغياب" },
+    { id: "review", label: "📖 رسالة مراجعة حسب القسم" },
+    { id: "custom", label: "✉️ رسالة مخصصة" },
+  ]
+
   return (
     <div>
       <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">الرسائل</h2>
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">نوع الرسالة</p>
+        <select
+          value={messageType}
+          onChange={(e) => setMessageType(e.target.value)}
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm font-medium dark:bg-gray-700 dark:text-white"
+        >
+          {MESSAGE_TYPES.map((t) => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </select>
+
+        <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-3">
+
+        {messageType === "start" && (
+        <>
         <p className="font-medium text-sm text-gray-900 dark:text-gray-100">إعلام أولياء الأمور بموعد الحصة (لكل قسم)</p>
         <select
           value={startClassId}
@@ -488,9 +599,11 @@ export default function Messages() {
         >
           {numbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
         </button>
-      </div>
+        </>
+        )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3 border-t-4 border-gold-500">
+        {messageType === "payment" && (
+        <>
         <p className="font-medium text-sm text-gray-900 dark:text-gray-100">تذكير بالاشتراك الشهري</p>
         <div className="flex gap-2">
           <select
@@ -556,9 +669,11 @@ export default function Messages() {
         >
           {paymentNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
         </button>
-      </div>
+        </>
+        )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 space-y-3 border-t-4 border-gold-500">
+        {messageType === "absence" && (
+        <>
         <p className="font-medium text-sm text-gray-900 dark:text-gray-100">تذكير بالغياب المتكرر</p>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           يشمل الطلاب بنسبة حضور أقل من {LOW_ATTENDANCE_THRESHOLD}% خلال الفترة المحددة
@@ -625,9 +740,11 @@ export default function Messages() {
         >
           {absenceNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
         </button>
-      </div>
+        </>
+        )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mt-4 space-y-3 border-t-4 border-gold-500">
+        {messageType === "review" && (
+        <>
         <p className="font-medium text-sm text-gray-900 dark:text-gray-100">📱 رسالة مراجعة حسب القسم</p>
         <select
           value={reviewClassId}
@@ -751,6 +868,101 @@ export default function Messages() {
             </button>
           </>
         )}
+        </>
+        )}
+
+        {messageType === "custom" && (
+        <>
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">✉️ رسالة مخصصة</p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500 dark:text-gray-400">نص الرسالة</p>
+        </div>
+        <textarea
+          value={customText}
+          onChange={(e) => setCustomText(e.target.value)}
+          rows={6}
+          placeholder="اكتب نص الرسالة هنا..."
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+        />
+
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          المستلمون (الكل محدَّد افتراضيًا — يمكن إلغاء تحديد من لا تريد مراسلته)
+        </p>
+
+        {loadingCustomStudents && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">جارٍ تحميل قائمة الطلاب...</p>
+        )}
+
+        {!loadingCustomStudents && customStudents.length > 0 && (
+          <>
+            <input
+              value={customSearch}
+              onChange={(e) => setCustomSearch(e.target.value)}
+              placeholder="بحث عن طالب..."
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-xs dark:bg-gray-700 dark:text-white"
+            />
+            <div className="flex gap-2">
+              <button type="button" onClick={selectAllCustom} className="flex-1 text-xs py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">
+                تحديد الكل
+              </button>
+              <button type="button" onClick={deselectAllCustom} className="flex-1 text-xs py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">
+                إلغاء تحديد الكل
+              </button>
+            </div>
+            <div className="max-h-56 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2 space-y-1">
+              {customFilteredStudents.map((s) => (
+                <label key={s.id} className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={customSelectedIds.has(s.id)}
+                    onChange={() => toggleCustomStudent(s.id)}
+                  />
+                  {s.name} <span className="text-gray-400 dark:text-gray-500">— {s.className}</span>
+                </label>
+              ))}
+              {customFilteredStudents.length === 0 && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-1">لا توجد نتائج</p>
+              )}
+            </div>
+          </>
+        )}
+
+        {!loadingCustomStudents && customStudents.length === 0 && (
+          <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">
+            لا يوجد طلاب بأرقام هواتف أولياء صالحة
+          </p>
+        )}
+
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {customSelectedIds.size} من {customStudents.length} مستلم مختار
+        </p>
+
+        {customError && <p className="text-red-600 dark:text-red-400 text-xs">{customError}</p>}
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleCustomConfirmSend}
+            className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm"
+          >
+            ✅ تأكيد الإرسال
+          </button>
+          <button
+            onClick={() => copyText(customText, () => { setCustomCopied(true); setTimeout(() => setCustomCopied(false), 2500) })}
+            className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
+          >
+            {customCopied ? "تم النسخ ✓" : "نسخ النص"}
+          </button>
+        </div>
+        <button
+          onClick={handleCustomCopyNumbers}
+          className="w-full text-emerald-700 dark:text-emerald-400 text-xs py-1"
+        >
+          {customNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
+        </button>
+        </>
+        )}
+
+        </div>
       </div>
     </div>
   )
