@@ -116,8 +116,18 @@ export default function PedagogicalDashboard() {
 
   const filteredSessions = hasActiveFilters
     ? effectiveSessions.filter((s) => {
-        if (filterClassId && s.classId !== filterClassId) return false
-        if (filterTeacherId && s.teacherId !== filterTeacherId) return false
+        // عند اختيار قسم، يكفي أن تنتمي الحصة لهذا القسم (s.classId) —
+        // بدون اشتراط تطابق s.teacherId أيضًا، لأن هذا الحقل هو "لقطة"
+        // الأستاذ الذي سجّل الحصة فعليًا في حينها، وقد يختلف عن الأستاذ
+        // الحالي للقسم إذا أُعيد إسناد القسم لاحقًا (راجع classNotebook.js).
+        // لو اشترطنا الاثنين معًا، أي قسم أُعيد إسناده يُخفي كل حصصه
+        // القديمة من نتائج البحث رغم أنها تخصّه فعلاً — وهذا ما كان يُظهر
+        // "0 نتائج" رغم وجود حصة مطابقة.
+        if (filterClassId) {
+          if (s.classId !== filterClassId) return false
+        } else if (filterTeacherId && s.teacherId !== filterTeacherId) {
+          return false
+        }
         if (filterSurah && !(s.lessons || []).some((l) => String(l.surah) === String(filterSurah))) return false
         if (filterFrom && s.date < filterFrom) return false
         if (filterTo && s.date > filterTo) return false
