@@ -4,6 +4,7 @@ import { db } from "../firebase"
 import { ASSOCIATION_NAME, BRANCH_LABEL } from "../config"
 import { getMonthlyFee } from "./Settings"
 import { classTimeLabel } from "./Classes"
+import { getSessionsForClass, buildReviewMessage } from "../utils/classNotebook"
 
 const MONTHS = ["01","02","03","04","05","06","07","08","09","10","11","12"]
 const MONTH_LABELS = {
@@ -117,6 +118,22 @@ export default function Messages() {
   const [loadingAbsence, setLoadingAbsence] = useState(false)
   const [absenceRecipients, setAbsenceRecipients] = useState([])
   const [absenceIncludeNames, setAbsenceIncludeNames] = useState(false)
+
+  // رسالة مراجعة حسب القسم (المرحلة 8) — تُبنى انطلاقًا من حصة محدَّدة من
+  // كراس القسم (المرحلة 7)، ثم يختار المستخدم المستلمين، ولا تُرسل أي رسالة
+  // إلا بعد تأكيد نهائي صريح.
+  const [reviewClassId, setReviewClassId] = useState("")
+  const [reviewSessions, setReviewSessions] = useState([])
+  const [loadingReviewSessions, setLoadingReviewSessions] = useState(false)
+  const [reviewSessionDate, setReviewSessionDate] = useState("")
+  const [reviewText, setReviewText] = useState("")
+  const [reviewStudents, setReviewStudents] = useState([]) // طلبة القسم الذين لهم رقم هاتف ولي صالح
+  const [loadingReviewStudents, setLoadingReviewStudents] = useState(false)
+  const [reviewRecipientMode, setReviewRecipientMode] = useState("all") // "all" | "selected"
+  const [reviewSelectedIds, setReviewSelectedIds] = useState(new Set())
+  const [reviewError, setReviewError] = useState("")
+  const [reviewCopied, setReviewCopied] = useState(false)
+  const [reviewNumbersCopied, setReviewNumbersCopied] = useState(false)
 
   useEffect(() => {
     getMonthlyFee().then(setMonthlyFee)
@@ -313,6 +330,89 @@ export default function Messages() {
     copyText(recipients.map((r) => r.phone).join(", "), () => {
       setAbsenceNumbersCopied(true)
       setTimeout(() => setAbsenceNumbersCopied(false), 2500)
+    })
+  }
+
+  // اختيار القسم يحمّل حصصه (من كراس القسم) وطلبته (لأرقام هواتف الأولياء).
+  const handleReviewClassChange = async (id) => {
+    setReviewClassId(id)
+    setReviewSessionDate("")
+    setReviewText("")
+    setReviewError("")
+    setReviewRecipientMode("all")
+    setReviewSelectedIds(new Set())
+    setReviewSessions([])
+    setReviewStudents([])
+    if (!id) return
+
+    setLoadingReviewSessions(true)
+    setLoadingReviewStudents(true)
+    try {
+      const [sessions, studentsSnap] = await Promise.all([
+        getSessionsForClass(id),
+        getDocs(query(collection(db, "students"), where("classId", "==", id))),
+      ])
+      setReviewSessions(sessions)
+      const students = studentsSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((s) => !s.deletedAt && s.active !== false && s.parentPhone && s.parentPhone.trim())
+      setReviewStudents(students)
+    } catch {
+      setReviewError("تعذّر تحميل حصص هذا القسم")
+    }
+    setLoadingReviewSessions(false)
+    setLoadingReviewStudents(false)
+  }
+
+  // اختيار حصة يولّد نص الرسالة تلقائيًا انطلاقًا من دروسها (نفس
+  // buildReviewMessage المستعملة في كراس القسم).
+  const handleReviewSessionChange = (date) => {
+    setReviewSessionDate(date)
+    setReviewError("")
+    const session = reviewSessions.find((s) => s.date === date)
+    setReviewText(session ? buildReviewMessage(session) : "")
+  }
+
+  const resetReviewText = () => {
+    const session = reviewSessions.find((s) => s.date === reviewSessionDate)
+    if (session) setReviewText(buildReviewMessage(session))
+  }
+
+  const toggleReviewStudent = (id) => {
+    setReviewSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const reviewRecipients = () =>
+    (reviewRecipientMode === "all" ? reviewStudents : reviewStudents.filter((s) => reviewSelectedIds.has(s.id)))
+      .map((s) => ({ name: s.name, phone: s.parentPhone.trim() }))
+
+  // إرسال فعلي فقط بعد تأكيد صريح من المستخدم (يذكر عدد المستلمين)، تمامًا
+  // كما تنص المواصفات: "لا ترسل أي رسالة دون تأكيد نهائي من المستخدم".
+  const handleReviewConfirmSend = () => {
+    setReviewError("")
+    const recipients = reviewRecipients()
+    if (recipients.length === 0) {
+      setReviewError("لا يوجد مستلمون بأرقام هواتف صالحة ضمن الاختيار الحالي")
+      return
+    }
+    if (!confirm(`سيتم فتح تطبيق الرسائل لإرسال هذا النص إلى ${recipients.length} ولي أمر. هل تريد المتابعة؟`)) return
+    openSms(recipients.map((r) => r.phone), reviewText)
+  }
+
+  const handleReviewCopyNumbers = () => {
+    const recipients = reviewRecipients()
+    if (recipients.length === 0) {
+      setReviewError("لا يوجد مستلمون بأرقام هواتف صالحة ضمن الاختيار الحالي")
+      return
+    }
+    copyText(recipients.map((r) => r.phone).join(", "), () => {
+      setReviewNumbersCopied(true)
+      setTimeout(() => setReviewNumbersCopied(false), 2500)
     })
   }
 
@@ -525,6 +625,132 @@ export default function Messages() {
         >
           {absenceNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
         </button>
+      </div>
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mt-4 space-y-3 border-t-4 border-gold-500">
+        <p className="font-medium text-sm text-gray-900 dark:text-gray-100">📱 رسالة مراجعة حسب القسم</p>
+        <select
+          value={reviewClassId}
+          onChange={(e) => handleReviewClassChange(e.target.value)}
+          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+        >
+          <option value="">اختر القسم</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+
+        {reviewClassId && loadingReviewSessions && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">جارٍ تحميل حصص هذا القسم...</p>
+        )}
+
+        {reviewClassId && !loadingReviewSessions && (
+          <select
+            value={reviewSessionDate}
+            onChange={(e) => handleReviewSessionChange(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+          >
+            <option value="">اختر الحصة أو الدرس المطلوب الاعتماد عليه</option>
+            {reviewSessions.map((s) => (
+              <option key={s.date} value={s.date}>
+                {dayNameForDate(s.date)} {s.date} — {(s.lessons || []).length} دروس
+              </option>
+            ))}
+            {reviewSessions.length === 0 && <option value="" disabled>لا توجد حصص مسجّلة لهذا القسم</option>}
+          </select>
+        )}
+
+        {reviewSessionDate && (
+          <>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-gray-500 dark:text-gray-400">نص الرسالة (قابل للتعديل)</p>
+              <button onClick={resetReviewText} className="text-xs text-emerald-700 dark:text-emerald-400">
+                استعادة النص الافتراضي
+              </button>
+            </div>
+            <textarea
+              value={reviewText}
+              onChange={(e) => setReviewText(e.target.value)}
+              rows={6}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm dark:bg-gray-700 dark:text-white"
+            />
+
+            <p className="text-xs text-gray-500 dark:text-gray-400">المستلمون</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setReviewRecipientMode("all")}
+                className={`flex-1 py-2 rounded-lg text-xs border ${
+                  reviewRecipientMode === "all" ? "bg-emerald-700 text-white border-emerald-700" : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600"
+                }`}
+              >
+                جميع أولياء القسم
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewRecipientMode("selected")}
+                className={`flex-1 py-2 rounded-lg text-xs border ${
+                  reviewRecipientMode === "selected" ? "bg-emerald-700 text-white border-emerald-700" : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600"
+                }`}
+              >
+                طلبة محددين
+              </button>
+            </div>
+
+            {loadingReviewStudents && (
+              <p className="text-xs text-gray-400 dark:text-gray-500">جارٍ تحميل طلبة القسم...</p>
+            )}
+
+            {reviewRecipientMode === "selected" && !loadingReviewStudents && (
+              <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2 space-y-1">
+                {reviewStudents.map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={reviewSelectedIds.has(s.id)}
+                      onChange={() => toggleReviewStudent(s.id)}
+                    />
+                    {s.name}
+                  </label>
+                ))}
+                {reviewStudents.length === 0 && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-1">
+                    لا يوجد طلبة لهذا القسم لهم رقم هاتف ولي مسجّل
+                  </p>
+                )}
+              </div>
+            )}
+
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {reviewRecipientMode === "all"
+                ? `${reviewStudents.length} رقم (كل أولياء القسم)`
+                : `${reviewSelectedIds.size} طالب مختار`}
+            </p>
+
+            {reviewError && <p className="text-red-600 dark:text-red-400 text-xs">{reviewError}</p>}
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleReviewConfirmSend}
+                className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm"
+              >
+                ✅ تأكيد الإرسال
+              </button>
+              <button
+                onClick={() => copyText(reviewText, () => { setReviewCopied(true); setTimeout(() => setReviewCopied(false), 2500) })}
+                className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
+              >
+                {reviewCopied ? "تم النسخ ✓" : "نسخ النص"}
+              </button>
+            </div>
+            <button
+              onClick={handleReviewCopyNumbers}
+              className="w-full text-emerald-700 dark:text-emerald-400 text-xs py-1"
+            >
+              {reviewNumbersCopied ? "تم نسخ الأرقام ✓" : "نسخ أرقام الهواتف (احتياطي)"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
