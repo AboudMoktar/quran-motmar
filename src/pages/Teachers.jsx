@@ -15,7 +15,14 @@ function isOnline(lastActive) {
   return !!lastActive && Date.now() - lastActive < ONLINE_WINDOW_MS
 }
 
-const emptyForm = { username: "", password: "", name: "", phone: "", role: "teacher" }
+const emptyForm = { username: "", password: "", firstName: "", lastName: "", phone: "", role: "teacher" }
+
+function splitName(full) {
+  const trimmed = (full || "").trim().replace(/\s+/g, " ")
+  const idx = trimmed.indexOf(" ")
+  if (idx === -1) return { firstName: trimmed, lastName: "" }
+  return { firstName: trimmed.slice(0, idx), lastName: trimmed.slice(idx + 1) }
+}
 
 export default function Teachers() {
   const [members, setMembers] = useState([])
@@ -45,7 +52,8 @@ export default function Teachers() {
 
   const openEdit = (m) => {
     setEditingId(m.id)
-    setForm({ username: m.username || "", password: "", name: m.name || "", phone: m.phone || "", role: m.role })
+    const { firstName, lastName } = splitName(m.name)
+    setForm({ username: m.username || "", password: "", firstName, lastName, phone: m.phone || "", role: m.role })
     setShowPassword(false)
     setError("")
     setSheetOpen(true)
@@ -55,18 +63,22 @@ export default function Teachers() {
     e.preventDefault()
     setError("")
 
+    const firstName = form.firstName.trim().replace(/\s+/g, " ")
+    const lastName = form.lastName.trim().replace(/\s+/g, " ")
+    const fullName = `${firstName} ${lastName}`.trim()
+
     if (editingId) {
-      if (!form.name.trim()) {
-        setError("يرجى إدخال الاسم")
+      if (!firstName || !lastName) {
+        setError("يرجى إدخال الإسم واللقب")
         return
       }
       try {
         await updateDoc(doc(db, "users", editingId), {
-          name: form.name.trim(),
+          name: fullName,
           phone: form.phone.trim(),
           role: form.role,
         })
-        logActivity("تعديل عضو", form.name.trim())
+        logActivity("تعديل عضو", fullName)
         setSheetOpen(false)
       } catch {
         setError("حدث خطأ أثناء الحفظ")
@@ -75,8 +87,8 @@ export default function Teachers() {
     }
 
     const cleanUsername = form.username.trim().toLowerCase()
-    if (!cleanUsername || !form.password || !form.name.trim()) {
-      setError("يرجى ملء اسم المستخدم وكلمة المرور والاسم")
+    if (!cleanUsername || !form.password || !firstName || !lastName) {
+      setError("يرجى ملء اسم المستخدم وكلمة المرور والإسم واللقب")
       return
     }
     if (form.password.length < 6) {
@@ -92,13 +104,13 @@ export default function Teachers() {
       await setDoc(doc(db, "users", cred.user.uid), {
         role: form.role,
         username: cleanUsername,
-        name: form.name.trim(),
+        name: fullName,
         phone: form.phone.trim(),
         deletedAt: null,
       })
 
       await signOut(secondaryAuth)
-      logActivity("إضافة عضو", `${form.name.trim()} (${ROLE_LABELS[form.role]})`)
+      logActivity("إضافة عضو", `${fullName} (${ROLE_LABELS[form.role]})`)
       setSheetOpen(false)
     } catch (err) {
       if (err.code === "auth/email-already-in-use") {
@@ -238,9 +250,14 @@ export default function Teachers() {
           )}
 
           <FloatingInput
-            label="الاسم الكامل"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            label="الإسم"
+            value={form.firstName}
+            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+          />
+          <FloatingInput
+            label="اللقب"
+            value={form.lastName}
+            onChange={(e) => setForm({ ...form, lastName: e.target.value })}
           />
           <FloatingInput
             label="رقم الهاتف"
