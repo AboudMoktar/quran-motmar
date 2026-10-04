@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { collection, onSnapshot, query, where, doc, setDoc, getDocs } from "firebase/firestore"
 import { db } from "../firebase"
 import { useAuth } from "../context/AuthContext"
-import { classTimeLabel } from "./Classes"
+import { scheduleLabel } from "./Classes"
 
 // Local-timezone-safe equivalent of `date.toISOString().slice(0, 10)` —
 // toISOString() converts to UTC first, which shifts the calendar day back
@@ -141,7 +141,7 @@ export default function Attendance() {
 
         {selectedClass && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            أيام الحصص: {(selectedClass.days || []).map((d) => DAYS_LABELS[d]).join(" - ")} — {classTimeLabel(selectedClass)}
+            أيام الحصص: {scheduleLabel(selectedClass)}
           </p>
         )}
 

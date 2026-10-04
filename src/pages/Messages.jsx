@@ -3,7 +3,7 @@ import { collection, getDocs, onSnapshot, query, where } from "firebase/firestor
 import { db } from "../firebase"
 import { ASSOCIATION_NAME, BRANCH_LABEL } from "../config"
 import { getMonthlyFee } from "./Settings"
-import { classTimeLabel } from "./Classes"
+import { scheduleLabel, scheduleDayKeys, timeForDate } from "./Classes"
 import { getSessionsForClass, buildReviewMessage } from "../utils/classNotebook"
 
 const MONTHS = ["01","02","03","04","05","06","07","08","09","10","11","12"]
@@ -23,9 +23,7 @@ const DAY_KEYS_BY_INDEX = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
 
 function classScheduleLine(cls) {
   if (!cls) return ""
-  const days = (cls.days || []).map((d) => DAYS_LABELS[d]).join(" - ")
-  const time = classTimeLabel(cls)
-  return [days, time].filter(Boolean).join(" — ")
+  return scheduleLabel(cls)
 }
 
 function dayNameForDate(dateStr) {
@@ -49,8 +47,9 @@ function toLocalISODate(d) {
 // scheduled days, so the announcement date follows the قسم's own timetable
 // instead of being picked manually every time.
 function nextSessionDate(cls) {
-  if (!cls || !(cls.days || []).length) return ""
-  const scheduledIndices = cls.days.map((d) => DAY_KEYS_BY_INDEX.indexOf(d)).filter((i) => i >= 0)
+  const dayKeys = scheduleDayKeys(cls)
+  if (!dayKeys.length) return ""
+  const scheduledIndices = dayKeys.map((d) => DAY_KEYS_BY_INDEX.indexOf(d)).filter((i) => i >= 0)
   if (scheduledIndices.length === 0) return ""
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -158,12 +157,13 @@ export default function Messages() {
   const defaultStartMessage = () => {
     const className = startClass?.name || "القسم"
     const dayLabel = startDate ? dayNameForDate(startDate) : "اليوم المحدد"
-    const timeFrom = startClass?.timeFrom || startClass?.time || ""
-    const timeTo = startClass?.timeTo || ""
-    const timeLine = timeFrom && timeTo
-      ? `من الساعة ${timeFrom} إلى ${timeTo}`
-      : timeFrom
-        ? `الساعة ${timeFrom}`
+    // توقيت اليوم المحدد تحديداً (قد يختلف عن توقيت يوم آخر لنفس القسم)،
+    // وليس توقيتاً عاماً واحداً للقسم كله.
+    const dayTime = timeForDate(startClass, startDate)
+    const timeLine = dayTime?.timeFrom && dayTime?.timeTo
+      ? `من الساعة ${dayTime.timeFrom} إلى ${dayTime.timeTo}`
+      : dayTime?.timeFrom
+        ? `الساعة ${dayTime.timeFrom}`
         : "حسب التوقيت المعتاد"
     return [
       `السلام عليكم ورحمة الله وبركاته،`,
@@ -187,8 +187,8 @@ export default function Messages() {
   }
 
   const startDayMismatch =
-    startClass && startDate && (startClass.days || []).length > 0 &&
-    !(startClass.days || []).includes(DAY_KEYS_BY_INDEX[new Date(`${startDate}T00:00:00`).getDay()])
+    startClass && startDate && scheduleDayKeys(startClass).length > 0 &&
+    !scheduleDayKeys(startClass).includes(DAY_KEYS_BY_INDEX[new Date(`${startDate}T00:00:00`).getDay()])
 
   useEffect(() => {
     if (!startEdited) setStartText(defaultStartMessage())

@@ -4,7 +4,7 @@ import { db } from "../firebase"
 import { exportExcel, exportExcelMultiSheet } from "../utils/exportExcel"
 import { printReport, printMultiSection, printReceipt, printReceiptsGrid } from "../utils/printReport"
 import { surahName, progressPercent } from "../utils/quran"
-import { classTimeLabel } from "./Classes"
+import { scheduleLabel } from "./Classes"
 import { calculateAge } from "./Students"
 import { monthLabel } from "../utils/finance"
 import { registerReceiptPrint } from "../utils/receiptCounter"
@@ -84,8 +84,7 @@ export default function Reports() {
       "اسم القسم": c.name,
       "المستوى": c.level,
       "المعلم": c.teacherName,
-      "الأيام": (c.days || []).map((d) => DAYS_LABELS[d]).join(" - "),
-      "الوقت": classTimeLabel(c),
+      "أيام الحصص وتوقيتها": scheduleLabel(c),
     }))
 
   const studentRows = () =>
