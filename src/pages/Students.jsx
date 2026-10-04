@@ -9,6 +9,7 @@ import FloatingInput from "../components/FloatingInput"
 import FloatingSelect from "../components/FloatingSelect"
 import { logActivity } from "../utils/activityLog"
 import { useAuth } from "../context/AuthContext"
+import { getCapacity } from "./Classes"
 
 // Local-timezone-safe equivalent of `date.toISOString().slice(0, 10)` —
 // toISOString() converts to UTC first, which shifts the calendar day back
@@ -43,8 +44,6 @@ const emptyForm = {
   enrollDate: toLocalISODate(new Date()),
   active: true,
 }
-
-const CLASS_CAPACITY = 20
 
 // Column header variants accepted in the imported Excel file (matched trimmed/lowercased)
 const COLUMN_ALIASES = {
@@ -189,7 +188,8 @@ export default function Students() {
     const currentSeats = students.filter(
       (s) => s.classId === form.classId && !s.waitlisted && s.id !== editingId
     ).length
-    const willWaitlist = currentSeats >= CLASS_CAPACITY
+    const classCapacity = getCapacity(cls)
+    const willWaitlist = currentSeats >= classCapacity
     const data = {
       firstName,
       lastName,
@@ -214,7 +214,7 @@ export default function Students() {
       }
       setSheetOpen(false)
       if (willWaitlist) {
-        setTimeout(() => alert(`القسم "${cls?.name || ""}" ممتلئ (${CLASS_CAPACITY} طالب) — تمت إضافة الطالب إلى قائمة الانتظار`), 100)
+        setTimeout(() => alert(`القسم "${cls?.name || ""}" ممتلئ (${classCapacity} طالب) — تمت إضافة الطالب إلى قائمة الانتظار`), 100)
       }
     } catch {
       setError("حدث خطأ أثناء الحفظ")
@@ -225,8 +225,9 @@ export default function Students() {
     const currentSeats = students.filter(
       (x) => x.classId === s.classId && !x.waitlisted && x.id !== s.id
     ).length
-    if (currentSeats >= CLASS_CAPACITY) {
-      alert(`القسم ممتلئ (${CLASS_CAPACITY} طالب) — لا يمكن الترقية الآن`)
+    const promoteCapacity = getCapacity(classes.find((c) => c.id === s.classId))
+    if (currentSeats >= promoteCapacity) {
+      alert(`القسم ممتلئ (${promoteCapacity} طالب) — لا يمكن الترقية الآن`)
       return
     }
     await updateDoc(doc(db, "students", s.id), { waitlisted: false })
@@ -399,6 +400,9 @@ export default function Students() {
   const formClassSeats = form.classId
     ? students.filter((s) => s.classId === form.classId && !s.waitlisted && s.id !== editingId).length
     : 0
+  const formClassCapacity = form.classId
+    ? getCapacity(classes.find((c) => c.id === form.classId))
+    : 0
 
   const filteredStudents = students.filter((s) =>
     (s.name || "").toLowerCase().includes(search.toLowerCase())
@@ -542,9 +546,9 @@ export default function Students() {
             ))}
           </FloatingSelect>
           {form.classId && (
-            <p className={`text-xs ${formClassSeats >= CLASS_CAPACITY ? "text-amber-600 dark:text-amber-400" : "text-gray-500 dark:text-gray-400"}`}>
-              العدد الحالي: {formClassSeats}/{CLASS_CAPACITY}
-              {formClassSeats >= CLASS_CAPACITY && " — القسم ممتلئ، سيُضاف الطالب إلى قائمة الانتظار"}
+            <p className={`text-xs ${formClassSeats >= formClassCapacity ? "text-amber-600 dark:text-amber-400" : "text-gray-500 dark:text-gray-400"}`}>
+              العدد الحالي: {formClassSeats}/{formClassCapacity}
+              {formClassSeats >= formClassCapacity && " — القسم ممتلئ، سيُضاف الطالب إلى قائمة الانتظار"}
             </p>
           )}
           <label className="block text-xs text-gray-500 dark:text-gray-400">تاريخ التسجيل</label>

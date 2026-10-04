@@ -19,7 +19,17 @@ const DAYS = [
 ]
 const DAY_KEYS_BY_INDEX = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
 
-const emptyForm = { name: "", level: "", teacherId: "", schedule: [] }
+const DEFAULT_CAPACITY = 20
+
+const emptyForm = { name: "", level: "", teacherId: "", schedule: [], capacity: String(DEFAULT_CAPACITY) }
+
+// السعة القصوى لهذا القسم (عدد الطلاب) — حقل اختياري لكل قسم؛ الأقسام
+// القديمة التي لا تملك هذا الحقل بعد تأخذ القيمة الافتراضية 20 دون أي
+// ترحيل يدوي للبيانات.
+export function getCapacity(c) {
+  const n = Number(c?.capacity)
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_CAPACITY
+}
 
 // ---------------------------------------------------------------------------
 // "الجدول الزمني" (schedule) — مصفوفة {day, timeFrom, timeTo}، توقيت مستقل
@@ -136,6 +146,7 @@ export default function Classes() {
       level: c.level || "",
       teacherId: c.teacherId || "",
       schedule: getSchedule(c),
+      capacity: String(getCapacity(c)),
     })
     setError("")
     setSheetOpen(true)
@@ -158,6 +169,11 @@ export default function Classes() {
       setError(`وقت النهاية يجب أن يكون بعد وقت البداية ليوم ${DAYS.find((d) => d.key === invalidDay.day)?.label || invalidDay.day}`)
       return
     }
+    const capacityNum = Number(form.capacity)
+    if (!Number.isInteger(capacityNum) || capacityNum <= 0) {
+      setError("يرجى إدخال سعة صحيحة للقسم (عدد صحيح أكبر من صفر)")
+      return
+    }
     const teacher = teachers.find((t) => t.id === form.teacherId)
     const data = {
       name: form.name.trim(),
@@ -166,6 +182,7 @@ export default function Classes() {
       teacherName: teacher?.name || "",
       schedule: form.schedule,
       days: form.schedule.map((d) => d.day),
+      capacity: capacityNum,
     }
     try {
       if (editingId) {
@@ -213,6 +230,7 @@ export default function Classes() {
               <p className="font-medium text-sm text-gray-900 dark:text-gray-100">{c.name}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">{c.level} - {c.teacherName}</p>
               <p className="text-xs text-gray-400 dark:text-gray-500">{scheduleLabel(c)}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">السعة القصوى: {getCapacity(c)} طالب</p>
             </div>
             <div className="flex items-center gap-3">
               <button onClick={() => openEdit(c)} className="text-emerald-700 dark:text-emerald-400">
@@ -264,6 +282,13 @@ export default function Classes() {
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </FloatingSelect>
+          <FloatingInput
+            label="السعة القصوى (عدد الطلاب)"
+            type="number"
+            min="1"
+            value={form.capacity}
+            onChange={(e) => setForm({ ...form, capacity: e.target.value })}
+          />
 
           <p className="text-sm text-gray-600 dark:text-gray-300">أيام الحصص وتوقيتها (كل يوم بتوقيته الخاص)</p>
           <div className="flex flex-wrap gap-2">
