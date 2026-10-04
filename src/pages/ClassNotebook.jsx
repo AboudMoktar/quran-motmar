@@ -169,11 +169,18 @@ export default function ClassNotebook() {
         await deleteSession(classId, editingDate)
       }
 
+      // الحصة تُنسب دائمًا إلى أستاذ القسم الرسمي (selectedClass.teacherId/Name)
+      // وليس إلى من يسجّلها فعليًا — فالإدارة قد تملأ كراس قسم نيابة عن
+      // الأستاذ (كما في هذه الحالة)، وإن نُسبت الحصة لحساب الإدارة بدل
+      // الأستاذ، لن تظهر إطلاقًا في "متابعة الأساتذة" الخاصة به رغم أنه
+      // الأستاذ الفعلي لهذا القسم. الأستاذ نفسه لا يرى هنا إلا أقسامه هو على
+      // أي حال (الفلترة أعلاه)، فهذا لا يغيّر شيئًا في حالته — فقط حالة
+      // الإدارة التي قد تُسجّل نيابة عن أستاذ آخر.
       await saveSession({
         classId,
         className: selectedClass?.name || "",
-        teacherId: user.uid,
-        teacherName: name || "",
+        teacherId: selectedClass?.teacherId || user.uid,
+        teacherName: selectedClass?.teacherName || name || "",
         date,
         lessons: cleanLessons,
         notes: notes.trim(),
