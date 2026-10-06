@@ -107,6 +107,7 @@ export function buildReviewMessage(session) {
     ...lessons.map((l) => `سورة ${surahName(l.surah)}: من الآية ${l.fromAyah} إلى الآية ${l.toAyah}`),
     "",
     "بارك الله فيكم وجزاكم خيرًا.",
+    "الجمعية القرآنية بمعتمر",
   ]
   return lines.join("\n")
 }

@@ -131,8 +131,6 @@ export default function Messages() {
   const [reviewRecipientMode, setReviewRecipientMode] = useState("all") // "all" | "selected"
   const [reviewSelectedIds, setReviewSelectedIds] = useState(new Set())
   const [reviewError, setReviewError] = useState("")
-  const [reviewQueue, setReviewQueue] = useState([])
-  const [reviewIndex, setReviewIndex] = useState(0)
   const [reviewCopied, setReviewCopied] = useState(false)
   const [reviewNumbersCopied, setReviewNumbersCopied] = useState(false)
 
@@ -418,23 +416,8 @@ export default function Messages() {
       setReviewError("لا يوجد مستلمون بأرقام هواتف صالحة ضمن الاختيار الحالي")
       return
     }
-    if (!confirm(`سيتم فتح تطبيق الرسائل لإرسال هذا النص إلى ${recipients.length} ولي أمر، رسالة SMS مستقلة لكل ولي. هل تريد المتابعة؟`)) return
-    // رسالة SMS مستقلة لكل ولي (وليس رسالة جماعية بعدة أرقام) — الرسالة
-    // الجماعية تجعل الهاتف يحوّلها إلى MMS.
-    setReviewQueue(recipients)
-    setReviewIndex(0)
-    openSms([recipients[0].phone], reviewText)
-  }
-
-  const handleReviewNext = () => {
-    const next = reviewIndex + 1
-    if (next >= reviewQueue.length) {
-      setReviewQueue([])
-      setReviewIndex(0)
-      return
-    }
-    setReviewIndex(next)
-    openSms([reviewQueue[next].phone], reviewText)
+    if (!confirm(`سيتم فتح تطبيق الرسائل لإرسال هذا النص إلى ${recipients.length} ولي أمر. هل تريد المتابعة؟`)) return
+    openSms(recipients.map((r) => r.phone), reviewText)
   }
 
   // يُحمَّل مرة واحدة فقط عند أول اختيار لنوع "رسالة مخصصة"، وليس في كل
@@ -862,28 +845,6 @@ export default function Messages() {
             </p>
 
             {reviewError && <p className="text-red-600 dark:text-red-400 text-xs">{reviewError}</p>}
-
-            {reviewQueue.length > 0 && (
-              <div className="border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 space-y-2">
-                <p className="text-xs text-gray-700 dark:text-gray-300">
-                  تم فتح الرسالة للولي {reviewIndex + 1} من {reviewQueue.length}: {reviewQueue[reviewIndex]?.name} ({reviewQueue[reviewIndex]?.phone})
-                </p>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                  أرسل الرسالة في تطبيق الرسائل ثم ارجع إلى هنا واضغط «التالي».
-                </p>
-                <div className="flex gap-2">
-                  <button onClick={handleReviewNext} className="flex-1 bg-emerald-700 text-white rounded-lg py-2 text-sm">
-                    {reviewIndex + 1 >= reviewQueue.length ? "إنهاء" : "التالي"}
-                  </button>
-                  <button
-                    onClick={() => { setReviewQueue([]); setReviewIndex(0) }}
-                    className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg py-2 text-sm"
-                  >
-                    إيقاف
-                  </button>
-                </div>
-              </div>
-            )}
 
             <div className="flex gap-2">
               <button
