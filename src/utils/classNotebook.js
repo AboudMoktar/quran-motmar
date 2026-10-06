@@ -102,9 +102,7 @@ export function buildReviewMessage(session) {
     "السلام عليكم ورحمة الله وبركاته،",
     "",
     "نعلمكم أن المطلوب مراجعته:",
-    // بدون رموز تعبيرية (emoji) ولا إرسال جماعي: كلاهما يجعل الهاتف يحوّل
-    // الرسالة من SMS إلى MMS.
-    ...lessons.map((l) => `سورة ${surahName(l.surah)}: من الآية ${l.fromAyah} إلى الآية ${l.toAyah}`),
+    ...lessons.map((l) => `📖 سورة ${surahName(l.surah)}: من الآية ${l.fromAyah} إلى الآية ${l.toAyah}`),
     "",
     "بارك الله فيكم وجزاكم خيرًا.",
     "الجمعية القرآنية بمعتمر",
