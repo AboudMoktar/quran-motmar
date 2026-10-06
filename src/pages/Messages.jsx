@@ -61,8 +61,16 @@ function nextSessionDate(cls) {
   return ""
 }
 
+// توقيع الجمعية يُضاف في نهاية كل رسالة (إن لم يكن موجوداً أصلاً).
+const SIGNATURE = "الجمعية القرآنية بمعتمر"
+function withSignature(text) {
+  const t = String(text || "").trimEnd()
+  if (t.endsWith(SIGNATURE)) return t
+  return t ? `${t}\n${SIGNATURE}` : SIGNATURE
+}
+
 function openSms(numbers, text) {
-  const url = `sms:${numbers.join(",")}?body=${encodeURIComponent(text)}`
+  const url = `sms:${numbers.join(",")}?body=${encodeURIComponent(withSignature(text))}`
   window.location.href = url
 }
 
@@ -586,7 +594,7 @@ export default function Messages() {
             {loadingEnrolled ? "جارٍ التحميل..." : "فتح الرسائل"}
           </button>
           <button
-            onClick={() => copyText(startText, () => { setStartCopied(true); setTimeout(() => setStartCopied(false), 2500) })}
+            onClick={() => copyText(withSignature(startText), () => { setStartCopied(true); setTimeout(() => setStartCopied(false), 2500) })}
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
           >
             {startCopied ? "تم النسخ ✓" : "نسخ النص"}
@@ -657,7 +665,7 @@ export default function Messages() {
             {loadingUnpaid ? "جارٍ التحميل..." : "فتح الرسائل"}
           </button>
           <button
-            onClick={() => copyText(paymentText, () => { setPaymentCopied(true); setTimeout(() => setPaymentCopied(false), 2500) })}
+            onClick={() => copyText(withSignature(paymentText), () => { setPaymentCopied(true); setTimeout(() => setPaymentCopied(false), 2500) })}
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
           >
             {paymentCopied ? "تم النسخ ✓" : "نسخ النص"}
@@ -728,7 +736,7 @@ export default function Messages() {
             {loadingAbsence ? "جارٍ التحميل..." : "فتح الرسائل"}
           </button>
           <button
-            onClick={() => copyText(absenceText, () => { setAbsenceCopied(true); setTimeout(() => setAbsenceCopied(false), 2500) })}
+            onClick={() => copyText(withSignature(absenceText), () => { setAbsenceCopied(true); setTimeout(() => setAbsenceCopied(false), 2500) })}
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
           >
             {absenceCopied ? "تم النسخ ✓" : "نسخ النص"}
@@ -854,7 +862,7 @@ export default function Messages() {
                 ✅ تأكيد الإرسال
               </button>
               <button
-                onClick={() => copyText(reviewText, () => { setReviewCopied(true); setTimeout(() => setReviewCopied(false), 2500) })}
+                onClick={() => copyText(withSignature(reviewText), () => { setReviewCopied(true); setTimeout(() => setReviewCopied(false), 2500) })}
                 className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
               >
                 {reviewCopied ? "تم النسخ ✓" : "نسخ النص"}
@@ -947,7 +955,7 @@ export default function Messages() {
             ✅ تأكيد الإرسال
           </button>
           <button
-            onClick={() => copyText(customText, () => { setCustomCopied(true); setTimeout(() => setCustomCopied(false), 2500) })}
+            onClick={() => copyText(withSignature(customText), () => { setCustomCopied(true); setTimeout(() => setCustomCopied(false), 2500) })}
             className="flex-1 bg-gray-700 text-white rounded-lg py-2 text-sm"
           >
             {customCopied ? "تم النسخ ✓" : "نسخ النص"}
