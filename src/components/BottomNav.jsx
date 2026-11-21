@@ -29,7 +29,13 @@ export default function BottomNav({ isAdminLevel }) {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-50">
+    // paddingBottom = safe-area : sur Android 15 (ex. Samsung A14) l'app est
+    // dessinée sous la barre de navigation du système (mode « edge-to-edge »).
+    // Sans cette marge, la barre d'onglets est cachée derrière les boutons du téléphone.
+    <nav
+      className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex z-50"
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+    >
       {tabs.map((tab) => {
         const Icon = tab.icon
         const active = isActive(tab.to)
@@ -41,10 +47,10 @@ export default function BottomNav({ isAdminLevel }) {
           >
             <Icon
               size={22}
-              className={active ? "text-emerald-700" : "text-gray-400"}
+              className={active ? "text-emerald-700 dark:text-emerald-400" : "text-gray-400"}
               strokeWidth={active ? 2.5 : 2}
             />
-            <span className={`text-[10px] ${active ? "text-emerald-700 font-medium" : "text-gray-400"}`}>
+            <span className={`text-[10px] ${active ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-gray-400"}`}>
               {tab.label}
             </span>
           </Link>
