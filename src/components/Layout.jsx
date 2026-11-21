@@ -39,7 +39,7 @@ export default function Layout({ children }) {
         </p>
       </header>
 
-      <main className="p-4 pb-20">{children}</main>
+      <main className="p-4" style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom, 0px))" }}>{children}</main>
 
       <BottomNav isAdminLevel={isAdminLevel} />
     </div>
